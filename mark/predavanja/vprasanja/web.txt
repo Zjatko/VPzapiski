@@ -1,0 +1,84 @@
+Zakaj pride do SQL vrivanja (vzroki)?
+Malomarnost (legacy), "na hitro narejeno", neznanje, slabo vzdrževanje, začasna rešitev ki je postala trajna
+
+Kaj je avtentikacija?
+Proces ugotavljanja identitete (preko imena/gesla, certifikata, MFA,passkey, 3rd party, ki to zagotovi)
+
+Kaj je avtorizacija?
+Proces potrjevanja/omogočanja operacije (po avtentikaciji, včasih dodatne zaščite  npr. ali lahko Janez prenese datoteko, ...)
+
+Kaj avtentikacija ne zagotovi?
+Pregelda nad oprecijami, ki jih avtenticirana oseba sme izvrševati,
+avtoriteto nad tretjimi entitetami (SIgenca,Rekono,...) => nimamo dostopa/nadzora, lahko ranljivo
+
+Kaj avtorizacija ne pokriva?
+Enkripcije (ne zagotovi da je kanal po katerem poteka komunikacija varen),
+Avtentikacije (klienta ali strežnika)
+
+Kaj je CSRF (Cross-site request forgery)?
+Z domene B delamo poizvedbe na domeno A (B je napadalčeva stran, A je pa legit stran)
+Uporabniku bomo prikazali napačno spletno stran (npr . facebok.com), ta bo delala poizvedbe na facebook.com (pravo stran) in tako bo facebok.com iz te strani kradel podatke, medtem ko bo uporabniku izgledalo kot da uporablja pravi facebook.
+
+Kaj je CSRF Žeton?
+Gre za avtentikacijo, da pokažemo da request delamo res mi (ne pa napadalec)
+Gremo na strain in se avtenticiramo, to nam zgenerira CSRF žeton, ki ga uporabljamo za nadaljne avtentikacije.
+Napadalec tako ne bo moral storiti session hijack, saj ne bo imel enakega CSRF žetona kot mi.
+
+Kaj je enkripcija?
+proces transformacije podatkov v obliko, ki ni berljiva/dosegljiva tretjim osebam (nepooblaščenim osebam) preko javnega in zasebnega ključa.
+Podatke je mogoče le prebrati, če imamo pravi ključ, (ali pa je ranljivost)
+npr. SSH, HTTPS,...
+
+Kaj je namen SQL vrivanja?
+kraja identitete, uničenje podatkov,sprememba podatkov/stanja, nedostopnost storitve, leakanje podatkov
+
+Kaj je Reflected XSS?
+Napadalec pošlje ostalim uporabnikom povezavo do varne strani, ki naloži dodatno kodo (npr. reklama ali pa query) (tipični GET)
+Strežnik bo servirsiral dodatne parametre ostalim uporabnikom, uporabniki pa morajo zato eksplicitno kilkniti gor. Uporabniku bomo preko preusmeritve domene ukradeli piškote
+
+Kaj je SQL vrivanje (injection)
+Gre za vstavljanje poljubne SQL (svoje) poizvedbe preko klienta/aplikacije, izkoriščanje nesanitazacije SQL poizvedbe z namenom sprememb na zalednem sistemu.
+
+Kaj je SSRF?
+napad preko proxy strežnika, ki nam potem da dostop do vseh zalednih sistemov (če ni zero trust modela)
+preko absolutizacije relativnih poti (Npr /etc/passwd, /images/abc.png > file://etc/passwd)
+
+Kaj je stored XSS?
+Napadalec shrani zlonamerno kodo na strežnik (npr comment na objavi, profili, forum,...), tako potem strežnik servira uporabniški vnos ostalim uporabnikom.
+
+Kaj so časovno odvisni napadi (SQL)?
+so SQL napadi,preko katerih preverimo verzijo sistema (npr z uporabo neke specifične funkcije v tej verziji, npr SLEEP), tako lahko ugotovimo, če bo naša ranljivost delovalo/poznamo kakšno ranljivost za specifično verzijo
+
+Kako se zaščitimo pred SQL vrivanjem? 
+Pravilna sanitizacija nizov (ločimo podatke in SQL kodo) => prepared statements
+Uporabimo ORM (Object-relational mapping) modele, escaping znakov
+
+Kako se zaščitimo pred SSRF napadi?
+Ne uporabljamo proxy-jev z dinamičnimi poizvedbami (ne dajamo user inputa direktno v poizvedbe)
+uporabljamo predvidene poti namesto uproabniških poti (nikoli ne loadamo direktno iz poti)
+Politika omrežnega dostopa: ne pustimo da se vsi serverji med sabo vidijo na omrežju => samo izhodni promet
+
+Kako se zaščitimo pred XSS?
+- Sanitizacija nizov (html escaping, < se spremeni v &lt, > v &gt) ali textContent (JS)
+- CORS (ne dovolimo povezav na katerkoli drugo domeno)
+- HTTPOnly piškoti (vklopimo ta flag, problem, ker potem ne moramo brati
+piškotov, če jih potrebujemo preko js)
+     3 variante: HttpOnly (samo HTTP ima dostop), Secure (piškoti se pošiljajo samo preko https), SameSite (blokiramo druge domene)
+
+Kakšne so metode/izvedbe SQL vrivanja?
+Preko form (user input)
+Preko seje/piškotov => sprememba vpliva na stanje v bazi
+Preko HTTP zaglavja (header)
+
+Naštej tipe SQL vrivanja?
+Union-based SQL:
+gre za enostavne OR stavke in komentar (---) (izkoriščanje true and false, 1=1 1=2)
+Error Based SQL injection:
+nepravilna izvedba, preko napake dobimo podatke,stack trace
+Blind SQL injection
+težko, ne vemo kaj dobivamo nazaj (nas tudi ne zanima), poskušamo preko HTTP requestov (npr, user je admin) (GET npr)
+
+
+
+
+
