@@ -1,0 +1,170 @@
+pwn0_zip
+
+
+gets-> nevarnost ker loh preveč prepišeš
+(po stacku lahko bedarije pišeš) -> zanimivi sta 
+return_addr ki pove od kje smo klical oz. kam se vrnemo po koncu funkcije //če to povozimo mi kontruliramo flow
+RBP -> kaže na začetek
+RSP -> kaže na konec
+
+base ponter se dvigne gor? kako vemo kam -> zapomnimo si ga
+base pointer gre pa tam kjer je prejšni ret addr
+
+ko se nekam vrnemo moramo stack pointer premaknt na eno prej k je ret addr v stacku (konec prejsnega bufferja)
+
+zdaj bomo skocili na funkcijo win (ret2win problemi)
+
+
+zdaj pa gremo v debugger
+general commands:
+kako začnemo debbugat main
+
+
+gdb main
+r -> zalaufa cel program
+
+če preveč vnesemo prepišemo ret addr in zadeva proba skočit
+SEGMENTATION FAULT 
+pokaže nam tudi stanje na moment k je crknla
+
+RBP smo povozil
+RSP se je nekam nastavil itd.
+RIP je pa nas instruction pointer //PROGRAM COUNTER
+RIP kaže na nem random addr
+
+potem imamo DISASM
+return je crknu ker je porbal it na 0x4141414141.... (AAAAAA) tuki ni memmorya
+
+potem imamo STACK(nam kaže kaj imamo nižje po stacku)
+in BACKTRACE(kako smo prišli do call-a)
+
+trenutno smo na main+38 in vse kar vidi notr so sami AAAAA tok smo sesul da nam ga ne kaže več
+
+Zdaj pa pejmo pogledat kako se sproti izvaja?
+v debbugerju nastavi breakpointe
+
+b* main //damo na main breakpoint
+r
+
+in ce še enkrat poženemo vidimo da smo se ustavil na začetku main-a
+
+klavno kar vidimo je samo da imamo tam en call in en puts //nekaj prebere nekaj izpiše
+
+ukaz ni// next instruction
+ker je bil zadnji ukaz ni lahko samo enter stiskamo
+
+4x smo stisnil enter in smo na tem callu(od gets).
+gets bere in zapiše na mesto spremenljivke. //lahko je ali pa ni na stacku
+če so veliki addresi vemoda je zadeva na stacku //npr 0x7fffffffff...neki //dodatno lahko se pogledamo stack pointer ker je tam blizu
+
+zdaj ko smo spet vpisali preveč A-jev in stisnemo enter lahko vidimo da se nam je bakctrace sesul. ampak program se vedno laufa. ZAKAJ? -> ker še ni pogruntal da se bi kaj takega zgodilo. //teh podatkov se ni uporabljal
+
+parkrat gremo naprej do puts in nam na vrhu izpise AAAAA...
+
+gremo do ret, probal bo it na naslov z samimi 0x414141414141 AAAAAA...
+
+in zdaj pridemo gor do segfault
+
+
+
+
+zdaj bomo probal skocit na win funkcijo, ne vemo pa kje je
+
+imamo super tool k laufa to namesto nas
+
+to je knjiznjica za python pwntools
+
+
+pip3 install --upgrade pwntools --break-system-packages
+
+to preverimo z import pwn
+
+
+interactive kot da bi na roke zalafual zadevo
+
+ctrl D da se ubije
+
+sol.py
+from pwn import * 
+
+p= process('./main')
+p.sendline(b"kebab") -> binary string to kar lahko zapišemo z bajti UTF8 tuki ne obstaja
+p.interactive()
+
+b"\x41" izpiše python A
+če ne more skonvertat pusti enako npr. b"\x04" ostane isto.
+
+
+
+evo in ko zdaj pozenemo python3 sol.py ki nam bo kar sam vpisal kebab
+
+
+v pwn knjiznjici imamo tudi gdb.debug
+
+
+lahko napisemo tudi 
+p = gdb.debug('./main', 'b * main')//odpre se nov terminal
+p.sendline(b"A"*64);
+
+c -> ce stisnem c in zalafuam naprej pridemo do main-a // ni direkt skocil
+
+ko zdaj pridemo do gets smo dal da skripta poslje naprej veliko A
+in ko pridemo do puts nam v prvem terminalu izpise veliko A
+
+nismo napsisal dovolj A
+kako vemo ali smo povozili BASE POINTER RBP ki se je spet nastavil na 0x4141414141
+return addresa pa nismo povozil
+
+zdaj moramo pa od win funkcije pogruntat lokacijo in bomo na return to dal.
+
+prvo dejmo sam pogledat
+
+
+
+
+
+kaj je v testnem primeru nad bufferjem?
+imamo še RBP in return addr 
+buffer je velik 20, pointer na 64bitnem sistemu je 8biten 64/8
+return addr je sam pointer nekam na kodo kar omen isto 8
+
+zdaj smo nadomestil pa dal notr 20 A 8 B in 8C
+recemo c
+gremo do call gets
+ vse ok 
+gremo do puts vse ok
+
+pridemo do returna in ne dela
+
+
+kaj je narobe?
+
+poglejmo registre
+
+return addres smo mislil da smo povozil ampak ga nismo 
+vidimo pa da je RBP na 0x4343434343 HOTELI SMO DATI B DOBILI SMO PA C IN ŠE TI SMO GA NAPOL POVOZIL
+
+lahko se zgodi da je umes random space zarad offsetov uspešno smo napisal 4C kar pomen da manjka do konca še 4C, s tem da smo hotel dati v ret addr kar pomeni 12 več (4 + 8)
+
+evo in zdaj smo dobili podatke na return vidimo 8 Cjev
+
+zdaj pa gremo iskat funkcijo
+
+gdb ima tudi obcijo -> disass main (v gdb programu)
+in vidmo cel assamly kje je kaksna funkcija
+
+mi napisemo disass win in vzamemo zacetek
+
+ok napisal smo zdj namest C naš main ampak on je to kontra obrnil. ZAKAJ?
+samo zaradi tega ker porbavamo iz SW na HW v neki obliki dajat in potem ko gre ven gre v little endian z ene strani gor dol z druge dol gor
+
+
+imamo pa za to v python eno funkcijo p64(0x401136) to nam zapakira v little endian
+in zdaj se izpise you win
+
+
+smo zavtomatiziral skripto da takoj dobimo you win
+
+samo zakomentiras tist gdb debugger. in pustis prvega
+
+ok ROPgadget bo cez 2 tedna

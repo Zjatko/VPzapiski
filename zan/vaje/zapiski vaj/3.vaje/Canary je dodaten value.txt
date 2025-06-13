@@ -1,0 +1,242 @@
+Canary je dodaten value
+ki se nastavi preden začnemo uporabljat naše stvari in potem ko končamo pogleda če je še vedno enak.
+
+
+ret_addr
+bp
+canary
+buffer
+
+med podatki ki jih smemo spreminjat in tam kjer ne smemo
+
+bp že ne smemo 
+buffer lahko
+
+kako delat ta zadeva?
+ob začetku vsake funkcje se nastavi. vsak function call
+
+
+void f()
+	- TUKI se bi canary nastavil
+	- 
+	- check canary čisto pred koncem preveri če so enaki
+	return
+kaj je return v assembly ?
+leave ret ukaza
+
+kaj naredi leave in kaj ret?
+
+ret -> pobere iz stacka naslov ki ga ima zapisanega in samo skoči tja (pop rip (instruction pointer))
+leave -> (pop rbp)
+
+kako se nastavi? iz kje?(canary)
+
+random zadeva 7 bytni zapis + 00
+
+
+za vsak function call posebi nastavljen random?
+dejansko se nastavi samo 1x za celo delovanje programa
+
+DODATNO 
+shrani se v fs register ki ga uporablja OS, s katerim določa process specific zadeve in tuki notr tudi canary nastavi
+kar pomeni da je znotraj programa vedno enak.
+
+mov === iz fs si shrani v rax
+in potem iz rax na rbp z nekim offsetom
+
+
+
+
+
+poanta da če uničimo karkol nad canary pomeni da je canary tudi sam
+check mora biti enak kot procesorskem tist FS
+
+v assembly
+
+enako ga da iz rbp z offsetom na rdx
+odšteje pogleda če je enako 0 in to je to
+
+stack smashing -> ker smo prevec stacka unicl ampak on je zaznal ker smo spremenil canary
+
+zakaj se pojavi cuden znak na koncu izpisa AAAAAA
+
+cel buffer se zafila
+ker smo popisal nas \0 in potem smo do naslednjega izpisoval in to so te bajti
+
+
+
+
+KAJ JE READ?
+read je sistemski klic
+
+gets -> C Standard library vsi znajo to nucat v ozadju pa se to da v sistemske klice.
+
+KAJ NAREDI READ?
+ - prebere kako?
+podamo 3 argumente
+lokacija, koliko veliko, file descriptor -> vsaka stvar k si jo lahko predstavljate je file iz (OS)
+imamo par rezerviranih FD 0, 1 ,2
+0:- stdin
+1:- stdout
+2:- stderr
+
+in če hočemo brat bomo dal stdin (0)
+
+
+read (0, buffer, 0x64);
+
+kako izgleda canary?
+dolg je in general 8bytov od tega je prvih 7 random potem pa 1 byte 0
+zakaj? -> ko berem da se pri tem 0 ustavi
+
+
+
+gledamo pwn 1 primer
+zdaj nimamo gets ki bi v nedogled bral
+koliko casa pa read bere?
+-dokler ne zapolni velikost ki jo določimo v read
+(ce jo nastavimo preveliko je problem)
+
+read prebere 100 0x64 -> 6 * 16 + 4* 16 na 0 = 96 + 4 = 100
+buffer imamo pa velik dejansko 64
+
+ta razlika je naš goldcard -> če naredimo enako kot zadnjič da win prepišemo bomo dobil error, stack smashing
+
+
+če pobrišemo cel buffer + še en byte dobimo še canary????
+naredimo osnovi sol3.py file samo A poslemo 32x notr
+
+
+preden se setbuf(stdin, null) polaufa kaj se bo zgodilo?
+ -> nastavi se canary
+prvo to poglejmo:
+
+
+x/20gx $rsp
+v formatu 20B
+gx je hexadecimalen sistem -> izpiše 64bitne pointerje
+$rsp je pa stack pointer
+
+
+gremo preden se setbuff zažene pogledat kako izgleda rbp, lahko vidiš tudi kaj je nad rbp
+
+ko vpišemo 32 A nam da v pomnilni eno 0 na koncu
+
+
+zakaj gre zadeva iz druge smeri -> ger izpisuje zadevo v little Indian zato je a na zacetku
+
+
+moramo zato dati notri 72 A
+
+ker smo notr porinl 00 imamo endline
+
+
+vzamemo linijo jih poberemo 7
+
+
+sesul smo canary ampak program se vedno ni preveril ali se je canary povozil
+
+se vedno lahko nekaj delamo z njim in imamo točno kaksen canary naj bi bil
+
+prepisemo return addr in popravimo canary
+
+dobimo disass win  in zagrabimo prvega
+
+ga dodamo v python script
+
+
+zdaj gremo pa na pwn2
+
+pwn checksec main
+ s to komando vidimo ce se da canary dobit ven ??? ish
+
+tuki imamo spet gets in pride do istega problema kot prej -> edino da gets namenoma porine notr NEW LINE (zaradi tega ne moremo uporabit identicne zadeve)
+ta nam ze sam porine \0
+
+kokrkol bomo sli po canaryu nekje nam bo dal \0 in ne bomo mogl sprintat canarya 
+
+tehnicno lahko se vedno out of bounds powritamo stvari
+
+printf -> zato ker nima formata na zacetku -> vrstica: printf(buffer) NIMA FORMATA
+kaj to pomeni?
+zadeva bo se vedno delovala, ampak izpise tisto kar bomo notr dal.
+npr če za vpis damo %p nam bo ta izpisal nek pointer. -> na kaj? ne vemo
+
+zakaj bi bil to problem? -> 
+
+
+kako dela printf?
+printf(1,2,3)
+1: string (format) kako izpiše vse
+2:
+3:
+
+koliko argumentov vzame?
+ne vemo, lahko ogromno lahko 0 -> variable argument (vararg) nimas pojma kok je in kaj so
+
+kako se variabilni argumenti posiljajo?
+-> preko rdi,rsi,rdx,r10 -> registiri
+
+klasicno se posiljajo preko stacka
+
+kar pomeni da takrat ko poklicemo novo funkcijo 
+se bo nekej nastavil en ret addr rbp in canary in spodaj bodo neke lokalne spremenljivke
+gor se nam bodo pa nastavil argumenti -> kar hočemo da se pošlje čez
+
+kaj to pomeni za nas ko pišemo %p. IZ KJE JE DOBIL TA POINTER?
+
+ce imamo ogromno argumentov ko vpisemo %p nam jih bo dajal nekje na stack
+
+ce bomo %p nabijal notr obstaja sansa da bi kaksno neumnost zadeli
+
+ce jih naspemamo se zacne nek pattern ponavljat 0x7025
+
+b"\x70\x25" -> nas input je nazaj najdl
+
+KAR POMEN DA SMO DOST PRELEZL PO STACKU DA SMO NASEL NAS BUFFER
+
+canarya se pa ne vidi
+
+8. pointer zgleda da so že naši p-ji
+
+ce vpisemo %8$p 
+izgleda malo drugace little Indian ampak je nasel
+
+70 24 38 25
+
+nas input od zadaj.
+
+
+kaj nam zdaj to pomaga?
+
+katero orodje nam bo pomagalo pri tem da najdemo canary?
+ZALAUFAMO DEBUGGER IN NAJDEMO CANARY IN KJE SE NAHAJA TA NAS INPUT, ce odpremo v debuggerju
+
+na zacetku sam p.sendline
+
+
+x/20gx $rsp
+vidimo canary
+
+in nam izpise 0x7024825 kje se to vbistvu nahaja?
+pogledamo kok manjka do canarya kar je +3 in potem damo 11 v python file in imas canary
+ZDAJ GA MORAMO IZ IZPISA DOBIT
+
+zdaj pa bi lahko iskali konc zacetnega printf("Enter your name: ");
+in beremo do konca vrstice -> p.recuntil(b': ');
+
+
+za formatiranje uporabimo int()
+
+lahko dodamo pa tudi base
+int (b"123",16) dobimo pointer
+
+
+od zdaj naprej je pa postopek isti kot pri prejsnem
+
+
+moramo pazit se na loop yes or no?
+
+
+
+

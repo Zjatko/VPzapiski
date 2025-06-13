@@ -1,0 +1,228 @@
+VARNOST PROGRAMOV 1.vaje
+
+binary exploitation 1.sklop -> spreminjas delovanje programa (control flow)
+nek input output
+
+web 2.sklop-> SQL injection ... iz tega ponvadi pridejo najvecji LEAKI
+primer nek leak iz turčije da lahko sestavis celo druzinsko drevo
+
+
+reverse engineering 3.sklop -> pogruntas kaj dela nek javascript vse do neke low level C kode.
+skunstruiras svojo kodo,(primer) dobis podatke s pretvarjanjem da si ti tista storitev
+v jsonu so imel username in password
+
+malware reversing -> da lahko ustavis malware moras pogruntat kako dela.
+
+
+secure software development 4. sklop
+ko nekdo pride preko zaščite je še vedno nek nivo varnosti.
+
+
+SELinux security addon, ki doda dodaten layer pravil attrib na binary file mape....
+da lahko rečeš file serverju, ti pa lahko dostopas samo do stvari ki imajo ta attrib
+
+če bi dobil access do naprave bi bil se vedno restrictan z strani okolja.
+
+
+
+
+
+
+#include <stdio.h>
+
+int main()
+{
+	printf("Hello, World!");
+	return 0;
+}
+
+cat main.c
+gcc -o out main.c -> dal bo nek binary(build)
+
+kaksen file pa je to?
+file mai.c -> C source, ASCII text
+ce pa napisemo file out
+pa dobimo ogromen izpis.
+
+
+BINARY FILE:
+sestavljeni so iz nekih segmentov
+
+ro -> read only podatki tu notri se nahaja naš "Hello, World!"
+rw ->
+text -> koda našega programa (shranjene so funkcije kot je npr main())
+tehnično ni v filu ampak se potem generirata spodnja dva
+heap -> 
+stack -> 
+not stripped -> notri ima neke helpful podatke da lažje dubuggamo
+vsem temu skupaj rečemo ELF datoteka
+OS na podlagi teh informacij ve kaj mora narest.
+
+Kje se pa začne koda izvajat?
+kaj je prva funkcija v assembly k se požene?
+še par stvari se pred main zažene
+	-argumenti pravilno nastavljeni in jih imamo na voljo 
+	-da so knjižnjice naložene
+okoli tega imamo še runtime C-ja
+
+
+potek: zgornji klice spodnjega
+_start -> tuki se bo naša cela koda začela izvajat
+__libc_startmain() - ta funkcija sele poklice main po tem ko nastavi svoje
+main()
+
+ce bi hoteli to pogledat
+objdump -d out
+
+-d dissasamble
+izpiše nam celoten text del od zgoraj(tisto kar je dejanske kode)
+če pogledamo gor imamo nek init , plt(funkcije katere kličemo z drugih librariev)
+puts pomeni samo put string
+
+npr. ce imamo printf brez formata bo to jemal samo kot putstring
+zato v tem binary ni printf ampak puts
+
+potem imamo section .text
+prva stvar je _start -> te kode ne prepoznamo nic od tega nismo napisali 
+vidimo da se je main inicializiral in klical libc_start_main
+ 
+spodaj vidimo main vidimo da se naloži pointer na hello world in naslednja vrstica je call puts@plt
+
+
+
+
+
+
+
+
+
+naslednji primer
+
+
+
+#include <stdio.h>
+
+int main()
+{
+	int n = 10; //dodelimo prostor ampak kje? -> kateri del memmorya -> na stacku!!!!! načeloma se rezervira 4byte (int)
+	scanf("%d", &n); // zaradi %d vemo da je int //& imamo zaradi tega ker scanf mora biti sposoben to nekam zapisat (zato mu pošljemo address)
+	printf("%d\n", n * 3);
+}
+
+
+gcc -o out main.c
+
+imamo 2 primera 
+ce mu nekaj podamo nam bo 10 povozil in nase uposteval, drugace bo pa naso 10ko uposteval in jo *3
+povedal nam je da ni dovolj stvari prebral
+
+tudi ce bi dal notr string bi bilo isto = 30
+ampak ne pride do nobenega errorja
+
+ce pa bi imeli int n;
+
+spet ne bi nic vpisal
+nam pa izpise nulo. -> nek random podatek v pomnilniku
+
+preko tega bi lahko dostopali in brali podatke kar preko pomnilnika
+
+npr openssl je imel neko funkcijo heartbeat -> heartbleed problem
+dostopali so do random pomnilnika s tem da niso poslali nič
+
+kaj je malo bolj težko za brat?
+Zanimivi so Stringi
+
+print("INFO: %s\n", Burek); // ta %s nam pove da je string
+
+char str[10];
+lahko bi pa scanf("%s",str );
+print("INFO: %s\n", str); 
+
+C ne pozna stringov (to je samo zapordje znakov -> zato moramo podati velikost tabele da lahko rezervira prostor).
+za končat stringe imamo \0, vse kar to je je hex 0x00 ali 0b 00000000
+
+kaj če damo več kot 10 charov?
+vse vpišemo, vse izpiše in potem se pritoži .
+
+ni failal takrat ko je zapisoval
+nam je zapisal nam je izpisal in sele pol se je pritozil.
+(NEKI JE PREPISAL KAR NE BI SMEL)-> ta zadeva je nek protection k je by default vklopljen
+gleda da ne prevozimo nekaj kar nismo hoteli.
+
+če bi dali veliko več notr pa dobimo segmentation fault
+zdaj pa pridemo do našega stacka in pogledamo kaj se dogaja z njim.
+
+zakaj stack sploh uporabljamo -> na njem se nahajajo lokalne spremenljivke za določeno funkcijo
+ko iz main klicemo neko funkcijo je kot stack-> klica funkcije shranimo tudi return address nazaj na main in ko se konča se vrnemo nazaj.
+
+
+
+poznamo tudi debugger gdb
+
+gdb out
+
+pwndgb je plugin (nek nickname za binary exploitation)
+na githubu nalozi si ga dol
+
+>r  = run
+ce imamo vnos AAAAAAAAAAAAAAAAAAA nam bo itak crashal, ampak na bo pokazalo stanje ko je crashal
+
+
+>disass main
+
+in gremo pod DISASM kjer vidimo da je prišlo do problema pri return nazaj iz funkcije
+in vrednost na desni se pokaze kot 0x4141414141414141 to so sami AAAAAAAAAAAA
+ker nismo zadel nobenega segmenta pride do SEGMENTATION FAULT
+
+kaj nam to pomaga?
+kaj pa če mi vemo točno kdaj bomo prišli do SEG FAULT in napišemo nekaj drugega, potem lahko izvajamo druge zadeve znotraj programa.
+
+
+obstaja neka knjižnica v pythonu ki se imenuje pwn
+.py file:
+
+from pwn import *
+p = gdb.debug('./out','b* main')
+payload = b'AAAAAAAA'
+payload += b'BBBBBBBB'
+payload += b'CCCCCCCC'
+payload += b'DDDDDDDD'
+
+p.sendline(payload)
+p.interactivate()
+
+
+to je samo skriptiranje nekih naših inputov.
+
+poženemo z python3 ime_fila
+odpre se nam nov terminal, tastari laufa proces
+
+
+zavrtimo se naprej
+pod poglavjem backtrace lahko vidmo cel loop iz start v lib_main v main
+in gremo en step naprej da dobimo vse pomešan notr to pomen da naš ret naslov so sami AAA oz. BBB ...
+
+//kaj vemo?
+točno kam bomo skočil
+//kaj lahko damo notr?
+definitivno kater koli memory k je executable. Lahko bi dal main nazaj notr
+namesto da bi skočil na prejšno funkcijo damo naslov main-a
+
+pogledamo kje se main nahaja in namesto CCC-jev
+payload += p64(0x0401136) to sam nek pointer jada jada python stuff
+
+
+vidimo da se je naš RBP nastavil na BBBBBBBBB
+
+//DODATNO
+trackamo stack in base pointer
+rbp kaže na začetek našega stacka
+ko hočemo podalšat zadevo rbp pointer premaknemo dol
+
+ko skočimo nazaj ne rabimo samo return addresa ampak tudi te RBP IN RSP
+
+//KONEC DODATNEGA TO NIMAM POJMA KAJ JE HOTEL POVEDAT
+
+backtrace se zdaj nastavi nazaj na main -> return zdaj kliče main in smo spet pri enem scanf
+
+to bi znalo biti problematično, npr dodeli nam pravice ceprav ni preveril ce jih lahko dobimo.

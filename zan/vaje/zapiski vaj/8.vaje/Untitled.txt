@@ -1,0 +1,264 @@
+time_0
+time_1
+
+
+sidechannel -> iz nekih dodatnih virov k ne bi smel leakat dobimo podatke (najboljpomembne so nam čas)
+
+kako hranimo gesla -> hashamo
+TOU time of use
+TOC time of change
+
+
+
+
+
+ko se uporabnik logina kako najdeš userja?
+
+v bazi pogledas username oz. mail
+
+če ti bo spletna stran odg. zelo hitro nazaj -> velikokrat to pomeni da uporabnik ne obstaja
+
+če se spravi hashat pa traja dodatnih cca. 150ms 
+-> to so tej timing napadi
+
+
+kaj pa TOU in TOC
+
+--------------
+pride ena spletna stran v funkcijo npr. example.si (kako preverimo če gre v notrajno mrežo?) -> preverimo ip
+kako iz domene preverimo ip?
+kater service se s tem ukvarja? -> DNS (iz domene mappa v nek IP)
+
+primer:
+
+if (dns(domain).is_internal()){error}
+else {http.get(domain)}
+
+če se nam example.si resolva na 1.2.3.4 ni internal in gre v get
+
+med if in else -> se lahko zgodi da smo spremenil naš ip na 127.0.0.1
+
+in potem gre lahko request na internal ip
+
+in to predstavlja ta TOC in TOU -> check je if, else je use
+
+
+time_0 priemr
+
+kaj naredi?
+najprej prebere nek file name
+preveri če obstja folder v katerega porine
+in če obstaja in če se začne z našim prefixom ga damo na deny list
+
+kaj naredi spodnji del kode?
+kaj naredi req.get(url) -> nek html dobimo iz spletne strani
+samo pobere nek url podatke katere bo zapisal v ta naš file
+
+
+
+evo in poženemo zadevo, če npr napišemo ime_datoteke (test) in gremo na domeno https://google.si se nam bo to vse zapisalo notr v naš test file
+ko pa poizkusimo spreminjat /bin/bash je pa prefix in nas blokira
+
+kaj lahko zdaj naredimo?
+probamo z relativno potjo priti do teh folderjev in vidimo da ne gre?
+
+kaj se je zgodilo -> v 8.vrstici imamo resolve() -> pogleda kateri file je to in vrne absolutno pot do njega
+
+in se npr ../../../bin/bash resolva v -> /bin/bash
+
+in z tem resolvom ne moremo v ez startsWith prelisičit....
+
+
+
+kaj bi še lahko sprobali?
+
+na kateri vrstici imamo TOC in TOU
+toc = 13
+tou = 23, ŠELE KO FILE ODPRE
+
+katerega tipa je filename
+
+kaj pa če bi dali eno link way simbolično pot kjer bi test slikal v /tmp/test (spet se resolva in bo na deny listi)
+
+
+
+cilj je da bo na zgornji točki pravilno resolval zadevo do spodnje ko jo bomo pa lahko spremenili (in program tega ne bo opazil ker je že preverjal)
+
+
+
+
+hočemo resolvat
+test v /home/../.../.../.../test in to na koncu v /tmp/test
+
+kako to dosežemo?
+
+med tem ko vpisemo test spet caka na url
+lahko mi damo en synlink
+
+vpisi 
+test
+http://google.com
+
+
+
+
+
+
+zapiski
+pathlib.Path("./test").resolve().as_posix()
+ker obstaja dobimo /tmp/test
+
+pathlib.Path("./test2").resolve().as_posix()
+bo pa nek realpath do tam (našega folderja)
+
+
+time_1
+server.c
+
+
+mutex -> zakleni zadevo da ne more nihce dostopat do teh spremenljivk
+da se ne bi zgodilo da 2 procesa povecata 1 counter vsak 1x ampak samo 1x se bi pa counter povecal ker sta skupaj dostopala do istega stevila in potem zapisala samo +1.
+
+imamo neki threadov->tok kokr je definiran
+vsak threat odpre svoj serve
+
+kaj pa serve?
+- prvo se poveže s clientom
+- dobi nek value od clienta ki se bo zabasal v buffer velikosti 8
+
+kaj naredi send_back() -> clientu pošle flag
+
+kaj moramo narest da pridemo do zastavce
+
+
+sudo docker build -t test .
+in potem na m bo dal nek socket do katerega se skonektamo
+
+sudo docker run -d --rm -p 1337_1337 test
+
+
+in da poženemo napišeš nc localhost 1337
+
+
+buffer je velikosti 8 bytov ker je spremenljivka long
+tok jih moramo poslat da dobi leetcode z tistim 1337c0de
+
+
+
+
+če razbijemo 1337c0de na vel bytov
+13,37,c0,de,00,00,00,00
+0x 00,00,00,00,13,37,c0,de TALE JE PRAVA
+zadeva more biti little Indian je treba vse okol obrnt
+
+de c0 37 13 00 00 00 00
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+naredili smo nov python file sol4.py
+
+kako smo do zdaj interictal s procesi?
+imel smo nek payload in smo ga poslal!
+S katero knjižnico?
+from pwn import *
+
+
+
+
+
+
+poglej si sol4.py fix znotraj linuxa znotraj vaje 8 time_1
+
+
+
+
+
+načeloma imamo 3 memory segmente iz katerih beremo pišemo podatke?
+če hočemo podatke nekam shrant jih shranimo v spremenljivke? kje so spremenljvke? --> stack (lokalne spremenljivke znotraj funkcij in cel trace)
+heap
+BSS -> globalne spremenljivke in take fore (kaksni staticni stringi itd.)
+
+nekateri deli memory so med threadi sherani nekateri ne
+je stack sheran? NE! zakaj? ker vsaka neki druzga dela -> vsi imajo drugacen stack in drugace postavljene spremenljvke
+
+heap??? DA
+notri so neki veliki dinamični podatki... je samo 1, en del heapa je thread local zaradi optimizacijo
+BSS -> globalne spremenljivke ta je pa itak shared DA
+
+
+
+Kje se nahaja naš buffer v programu, ker je neka spremenljivka bi lahko bil v stacku lahko pa v BSS
+ampak ker je globalna je v BSS, to za nas pomeni da do njega lahko vsi threadi dostopajo
+
+
+če je zaklenjen thread se vedno lahko pišemo v buffer.
+kaj lahko mi naredimo?
+
+sam zalaufamo se en connection
+
+
+
+
+kar delamo je to da bomo spammal in probal vmes med if- pridt in ju zamenat tako kot nam paše
+na prvem jevrednost 1337c0de drugi bi pa dobil deadc0de in bi bilo super!
+
+
+
+t1			t2 		buff
+bo poslal 1337				1337
+1 check pass				1337
+			dead		dead
+			1 CRKNE		dead
+2 check pass				dead
+3 flag
+
+
+if (1337) (1)
+	if (dead) (2)
+		flag. (3)
+
+
+
+
+
+
+
+s tako kodo lahko pridemo skozi ampak je šansa zelo majhna
+lahko naredimo en for ali pa while
+
+
+
+
+
+evo smo dodal while true
+dodal smo if b flag sam print da vidimo da je prisel do konca
+
+
+kaj je fix?
+BUFFER ne bi bil global , oz. za vsak thread posebej bi bila sansa zelo majhna
+
+to se ponavadi dogaja v driverjih v kernelih!
+asinhrono govno pa to!
+
+#1 podatke skopiras
+#2 sprocesiraš
+
+ne da bi veckrat fetchal
+
+
+

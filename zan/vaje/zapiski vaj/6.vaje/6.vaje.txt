@@ -1,0 +1,189 @@
+6.vaje
+nalozis 
+web_3
+in zazenes
+sudo systemctl start docker
+sudo docker compose up -d
+
+in se nam zalaufa
+
+
+Injections: 
+CROSS SIDE SCRIPTING -> katero zadevo smo napadal (uporabnika)
+kaj je sploh poanta XSS? 
+
+ko odpres spletno stran kaj vidis?
+PRVA STVAR -> dobis response ki ima nek page 
+v čem je page? HTML
+
+nek standarden page v katerega porines nek title content, title content
+in če bi napadalec naredil nov post npr:
+
+title: test
+content: neki nedela
+
+
+kdo tudi nastavlja cookije? server in vsakic k posles request imas zraven se te piskotke ki ti jih je nastavil
+te piskotki e posiljajo gor in dol in zato so si zmislni localStorage
+
+
+s tem imas lahko spletno stran ki ni povezana na internet oz ne fetcha sproti, samo kar je v localStorage dano se prikaze
+
+iz tega ponavadi najraje krademo podatke?
+
+in kaj zdaj ko dobimo piskotke in localStorage?
+-> moras jih poslat k sebi -> to je se vedno na browserju enega tretjega
+
+kako si jih lahko posljemo?
+
+- direct msg (trackable in vidno)
+ali pa naredimo request na en naš malicous server in lahko tja poslemo zadeve-> znotraj javascripta lahko delamo kar hocemo
+
+in tako lahko nastavis sebi sejo nekoga drugega in dobis banko nekoga drugega
+
+predmet digitalna forenzika ! vsak let ima sheckite mi v facebook
+imgdump telefona baje dobr predmet
+
+s tem smo opisal stored xss?
+-zakaj -> ker so podatki shranjeni na serverju
+
+
+Kaj je pa drug tip XSS?
+- Reflected -> da v linku posles svoj code
+
+kako izgleda in kako se razlikuje od phishinga?
+
+phishing -> podobena ampak ne ista stran
+Reflected XSS -> dejansko napadamo napako na strani
+ko kliknemo na link pridemo na legitserver? -> pravi request -> odgovor pravi html ki neki dela
+
+Kje zdj dobimo XSS notr?
+
+HTTPS://google.com/search?q=search
+protokol domena uri query
+
+
+tuki notr lahko damo druge stvari notr -> npr nase lastne html elemente ali pa celo kodo
+če nekdo to ne odpravi bi se html izvedel wow (mesamo podatke in html)
+
+"neki moras poslat in nekdo more stisnit link"
+
+Prav zaradi tega je STORED dosti bolj problematičen -> enkrat vpises neki v bazo in vsi uporabniki bodo imeli problem
+
+
+sudo docker ps 
+da vidmo kaj trenutno laufa
+
+odpremo stran na portu localhost:8080
+gremo na /new in probamo dati <b>tekst</b>
+in vidimo da je zadeva bold
+direkt zmesamo podatke in htmlkodo
+server ne loci med user podatki in ze tistimi ki bi prej mogl tam bit
+
+
+sem notri bi lahko dali skripto
+
+npr v body
+
+
+Danes je lep dan <script>alert("test")</script>
+
+in zdaj ko odpremo nas lepo alerta -> zdaj si pa predstavljal da to uporabljajo tudi drugi
+
+zdaj lahko pokrademo localStorage/Piskotke
+kako pridemo do piskotkov?
+document.cookie
+
+
+
+tuki je nevarno hodit na nevarno spletno stran ki je vounarable si predstavljas da bi banko dobil
+
+zdaj si ga moramo poslati?
+
+
+lahko ga bi dali v nov post? glupo
+lahko pa damo na nek remote server, kjer si shranjuje piskotke
+
+
+zdaj pa dostopamo do localstoraga...
+alert(JSON.stringify(localStorage))
+
+in enako kot prej si lahko te podatke poslemo drugam
+
+
+
+vidimo pa se da pred formom v new imamo request.get("invitation")
+in tako lahko nucamo reflected xss in tako samo napisemo pod query ?invitation=<script>alert(document.cookie)</script>
+
+tuki bi moral ta link vsem poslat....
+zelo vprašljivo kok dalec bi prisel v primerjavi z stored xss
+
+
+pri phishingu niti ne mores do cookiejev ker si na napacni strani!
+
+gremo na zascite:
+
+ESCAPING: (edina zadeva ki jo lahko naredimo "pasivno scitimo uporabnika")
+
+
+python ima eno svojo knjiznico html
+from html import escape
+
+in samo escapas
+title = esacape(request.form.get('title')):
+
+
+docker compose up -d --build
+
+
+
+že v javascriptu je neka taka fora
+nek element ki ga nekje zagrabmo
+element.innerHTML = "nastavi na nek string iz API"//to porine notr kot html in se bo sparsal kot html
+element.text = "isti string kot gor" in tuki bo escaped
+
+Kaj pa lahko naredimo poleg escape?
+
+HTTP ONLY COOKIE do njega ne moras dostopat z javascriptom
+če pogledas kako je cookie shranjen lahko vidimo da je nastavljen en paremeter httponly na false
+posle se samo zraven takrat ko se http stvar posle
+
+
+
+obstajajo opcije kako nastavit server da ne sprejema vsega
+http promet.si
+
+in ima ogomen content-security-policy -> sam browser bo videl da neki ni po security policiju ne bo izvedel
+
+browser bo vse polaufal ampak ne bo naredil requesta
+
+cross site request --forgery?
+obstajajo csrf tokeni ki so samo ena simpl preprosta zadeva
+preden posles denar moras jet na page kjer vpises podatke in tist page najprej posle nazaj token -> in ko poslemo nas request je treba poslat nase podatke
+in se token -> to pa ni nujno da ga imaš
+
+težje je "pofakat", z mal truda se ga da dobit
+
+
+
+
+priporocena uporaba content security policya in httponly cookijev -> najbl trivialno da ne morejo kar tako bedarije delat!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

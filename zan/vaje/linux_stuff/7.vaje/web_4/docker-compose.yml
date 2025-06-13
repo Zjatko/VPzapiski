@@ -1,0 +1,7 @@
+services:
+  node:
+    image: varprog-test
+    build: .
+    platform: linux/amd64
+    ports:
+      - 8080:3000

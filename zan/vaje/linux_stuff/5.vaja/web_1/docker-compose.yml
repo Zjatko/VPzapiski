@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  mysql:
+    image: mariadb:11.3
+    environment:
+      MARIADB_RANDOM_ROOT_PASSWORD: 1
+      MARIADB_USER: varprog
+      MARIADB_PASSWORD: varprog
+      MARIADB_DATABASE: varprog
+
+  php:
+    image: varprog-test
+    build: .
+    platform: linux/amd64
+    ports:
+      - 8080:80
+      

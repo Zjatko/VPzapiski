@@ -1,0 +1,248 @@
+kako se držimo kaj delamo
+kako na vrhu zaščitimo vse te zadeve!
+
+kako dejansko najdt vulnerability!!!!
+
+vreže te v neko random kodo in zdej najdi te zadeve k jih dejansko misliš
+
+def_6
+
+imamo neko polje k ga preberemo iz datoteke
+bi vi znali nek tak file sestavt?
+kako izgleda datoteka k nekaj loadamo iz nje?
+
+dobimo n ki nam pove koliko različnih x in y
+
+
+
+zato mora prva stvar biti koliko x in y-nov imamo
+
+3 
+5 5
+0 10
+10 10
+3
+5 5 0 10 
+5 5 10 10
+0 10 10 10
+
+compilaš in poženeš
+
+
+te meje ki jih mi nastavimo niso nujo prebrane iz datoteke
+kako preverimo če je preveč ali premalo na tisti točki!
+
+bolj težko ker še nimamo podatkov na naprej!
+
+kaj pa lahko preverimo pri scanf?
+-št. vnosov
+kako bi jo popravil -> tako da bi čekiral če je dejansko prav!
+
+da avtomatiziramo pregled imamo eno super zadevo ki se ji reče 
+phazer???
+vzame naš program in vnaša stvari da pogleda če zadeva crashne
+in to ne dela popolnoma random -> nekaj podamo zraven da lepše dela->(hevristika) ki je samo primer inputa
+
+damo mu par primerov da stabilno zmeče zadevo
+in tako naredimo par testnih datotek
+
+npr. še en:
+
+4
+5 5
+5 15
+10 0
+10 10
+4
+5 5 5 15
+5 15 10 10
+10 10 10 0
+10 0 5 5
+
+enkrat bo treba napisat testov za naše funkcije in tako jih bomo rabil napisal irl
+
+
+2
+0 0
+ 20 80
+2
+0 0 20 80
+0 80 20 0
+
+
+dodamo mu binary in testne primere -> malenkost randomiziral bo stvari ampak bo probal kaj spreminjat! semi inteligentno
+moramo tudi compiler dodat
+
+in ko bo stvar crashila si bo naredil log
+nek afl imaš v readme
+
+ne pozabi si tista 2 exporta nastavit
+na proper sistemu si bi os nastavil crashfile v dumpe
+to je Linux delal in se je vse zafilal
++ drugi je nek performance mode ki ga ne potrebujemo
+
+
+damo input in output folder
+
+
+da poženemo fuzzer
+afl-fuzz -i input -o output ........
+lep UI ima
+
+
+
+strategije
+bit flip
+havoc
+itd.....
+
+
+vidimo da imamo veliko crashov ampak samo 11 saved
+kaj bi to lahko pomenilo?
+
+probs je toliko razlicnih poti do crasha!
+bl unique crashe shrani!
+
+spodaj imamo tudi total timeouts ki jih je pa par tisoč
+zdaj ko jih imamo ogromno, gremo lahko pogledat kaj se je zgodilo
+
++ da nam nek file k lahko samo resumamo tole in je kr nice!
+
+
+
+ko pogledamo output defaults mapo :
+edina pomembna 2 za nas:
+ - crashes (kdaj je zadeva odletela)
+ - hangs (to so te timeouti) k je čakal na nasledni input in ni nikoli dokončal
+
+
+če odpremo crashe lahko vidimo
+katero operacijo je naredil da crkne
+
+velike številke, bite flipal, aritmetika
+
+
+potem bolj spodaj so pa te random momenti ki pridejo in scrashajo zadevo
+
+
+
+če pogledamo prvega
+
+cat /outputs/default/crashes/id:00000 itd. do konca vrstice
+
+//
+nek input:
+
+
+//
+
+in poženemo vidimo kako je izgledal graf ob crashu
++ 
+2
+0 0
+20 80
+2
+0 0 200 80 20
+
+izrisal je vse!
+potem je pa crashnil zaradi velikosti grida! ki je velikost 80x20 mi smo pa vtaknil 20
+
+in potem je to po stacku šlo čez in smo dobili stack smashing detected (ubili smo canary)
+
+
+kako bi to popravil?
+- damo cap na velikost
+
+v fill line
+po max in min
+sam omejimo z min in max zadevo
+
+
+in omejimo na 
+
+minx npr če je manjši od 0 sam damo na 0 če je večji pustimo pri miru itd.
+maxx
+miny
+maxy
+
+
+in se vrtimo čez vse te crashe in jih popravljamo spet naletimo na enega ki nam crasha
+2
+0 0
+2000 80 20 08
+2 80 200
+0 020
+
+tuki crkne k sestavlja nod-e
+
+enga je dal na 0 0
+drugega pa na 2000 80
+in to je pisal nekam kjer ne bi smel in je kakica
+
+
+in podobo tudi tu popravimo s tem da omejimo na samo "screen"
+
+
+
+
+zelo pogosto rešijo en in isti problem ki se miljonkrat pojavi!
+spet naletimo na novega
+
+2
+0
+20 80
+2 
+: 0200 80 20 0
+
+tuki vidimo da nam
+: crashne
+
+
+iz def programiranja smo se naučili da gledamo outpute in če != 1
+ali != 2 preverimo če je pravilno prebrano
+enako dol v fillgrid != 1 in != 4
+sam returnamo 1 povsod!
+
+in še v main ta readgrid in fillgrid pogledamo
+
+in zdaj samo dobimo ta return 1 da je bila napaka! "ni sparsal podatkov"
+
+
+zdaj lahko še vse crashe damo v mapo z inputi da se bomo kaj novega naučili!
+
+
+
+zdaj ko smo spet poglnali smo zelo hitro prišli na 150k + in nimamo niti enega timeouta -> zato ker smo printf čekiral
+
+
+fuzzer je zelo koristen, ampak ko eno stvar popraviš ponovno zalaufaš in to traja!
+uporabljajo se za bolj low level stvari ali kakšne plugine
+
+
+jpegxl -> nov standard za delat za jpege
+isto tudi v libjxl uporabljajo fuzzerje!
+
+seveda pa on ne bo našel 100% vseh napak
+
+tudi naši popravki lahko introducajo napake!
+
+minx in maxx premaknemo tako kot je treba
+
+če bi bila oba x-a prevelika bi samo max prestavil za minx in zadeva ne bi delovala
+je pa velik hit ratio -> prej ali slej bi tudi to našel
+
+
+pozor:
+
+program moramo pripravit tako da ve kaj dela
+da bo uspešno prišel čez vse zadeve
+in v tem setupu gre lahko kaj narobe
+stvari ki jo pa nikoli ne bo našel -> npr. da zalaufa brez inputa
+
+sudo je imel nek problem da si pognal neki brez arugmentov je pa jemal in nekih drugih variablov
+kljub konstantni uporabi fazerja to niso odkrili, dokler ni nekdo izkusil xD
+
+tudi veliko web frameworkov ima svoje fazerje
+uporaba: mission critical stvari
+
+

@@ -1,0 +1,341 @@
+nazadnje smo gledal time of use in time of check
+zdaj gremo pa na zadnjo temo predmeta
+
+defensive programing...
+
+kaj se lahko zgodi ko programirate
+
+program daš bratrancu stestirat
+in naredi napačen vnos in crasha xD
+kaj bi moral narest -> robusten vnos narest!
+
+če hočemo napisat stabilen ransomware na kaj moramo pazit?
+- da sistem najde virus....
+- (kaj vse gre lahko narobe v kodi) -> odpremo file začnemo encryptat kaj se lahko zgodi vmes -> izbris
+(kaj se zgodi?)-> vse gre v kakico
+
+treba je čekirat! če slučajno file izgine ? zakaj idk.
+file zihr obstaja, file je zihr tam, ga probamo odpret, se ne odpre ? drug proces ga uporablja, nimamo pravic.....
+treba je preverjat?
+
+def. p. lahko začnemo v absurde nabijat
+imaš vse pravice do fil-a, brat delat
+kaj se lahko zgodi z file systemom vmes? lahko izgine xD IT FRI moment.
+kaj se lahko nasploh zgodi z resourci! RAMa zmanjka, prostora itd.
+
+zmanjka pomnilnika z igro snake xD 2d array ekstremno velik ni priročen(sploh če je večinoma prazna).....
+
+
+kaj se lahko zgodi z povezljivostjo?
+file system je lahko lokalen ali pa remotely mounted. NET lahko odleti in je problem!
+
+
+defensive programing je bl za lovljenje teh stvari in jih probamo ujet
+
+def_0
+prvo gledamo python
+
+import prefix je vse ok
+
+kaj ta snipet naredi?
+- uporabnik da pot in datoteko
+- preverimo vnos če folder obstaja in če je na deny list
+- 
+
+
+problemi:
+
+1. treba je končati po print("Folder does not exist")
+	exit(1) //npr.
+
+2. problem ni resolve() -> lahko relativno dostopamo do deny folderjev
+moramo spremeniti v abs pot in preverit
+abspath(filename) oz. realpath(filename) še za softlinke
+
+3.potem kar odpiramo file z tem filenamom
+- nimaš pravic za datoteko
+- je izbrisana vmes
+
+kako to preverimo?
+with_open
+ali pa po odpiranju pogledamo
+
+if not file:
+	print("ne obstaja")
+	exit(1)
+
+treba je še ujeti exception:
+
+try:
+	//
+
+except IOError:
+	neki neki IOError 
+	exit(1)
+
+except PermissionError://pazi to je del IOErrorja in je treba dati pred njega če hočemo upoštevat
+	neki neki permission error
+	exit(1)
+except Exception as e:
+	izpis(e) // da vidimo kaj je problem
+
+brez tega bi program samo crashnil, tako pa vemo kje in kaj je šlo narobe
+
+4. ko gledamo koliko linkov hočemo poslat bi lahko notri zabil črko in crkne
+
+kaj naredi eval() lahko vpišemo python kodo in jo samo izvede //os.system(/bin/bash) in si v bashu
+zakaj smo ga tuki sploh dal in zakaj ne dela brez.
+input je drugače string mi pa hočemo številko.
+
+vseeno pa hočemo cifro kaj naredimo samo castaš int() -> če ni int bo spet error
+spet naredimo en
+try:
+	//vpis
+except e:
+	print(e)
+
+5.V naslednjem delu kjer vpisuje, potem še response status code zapiše v nek file, sam request sprejema samo HTTP,HTTPS in smo nekako varni pred drugimi
+
+kaj bi lahko bil problem?
+če dobimo kodo 200 bo vse ok, če pa 500 internal server error pa se še vedno samo status code izpiše. Se lahko zgodi da vrže exception?
+
+httpbin ->za testiranje vseh možnih napak ki jih lahko vrne http
+
+zapiše notri 503 in se ne sekiramo.
+
+
+kaj se pa lahko zgodi da je narobe?
+če npr kot vnos napišemo namesto url a
+MissingSchema(kaj bi to pomenil)
+pozabili smo na protokol
+zdaj damo https a
+
+tempfailure kot name resolution
+a ni našel kot domeno
+
+
+try:
+	//response = requests.get(url)
+except requests.exceptions.MissingSchema:
+	print
+except InvalidURL
+except TimeoutError
+except Too many redirects
+except RequestException
+except Exception as e:
+	print(e)
+tega je ogromno. ampak je nujno!
+
+
+
+spletna stran-> geslo mora imeti vsaj 12 znakov, črke, simboli, itd.
+ne pove ti teh vseh stvari skupaj ampak zaporedno vsako in popizdiš. in potem folk to vse zapakira skupaj in v tem koraku lahko pusti v kodi neumnosti
+
+
+6. deljenje z 0 je problem če je 0 kot vnos!
+pred tem preverimo
+if lines == 0:
+	file.write(trajanje 0 sekund!)
+else:
+	trajal je //isto kot prej
+
+
+zalafuamo program ki ima nek conf file, preberemo podatke in laufamo naprej
+če se program zapre se datoteka načelona zapre
+še vedno se pa lahko zgodi da če ne zapremo stvari in naprej uporabljamo
+kurimo resource in file deskriptorje ki so omejene zato je nujno treba zapirat kar odpiramo!
+
+npr če se ura prestavi med start time in endtime je trajanje celo uro wow!
+lahko dobimo ogromnega ali pa negativnega
+načeloma je veliko knjižnic timezone aware in niso to neki resni problemi
+
+ta zadeva ima več exceptionov kot slovenščina!
+
+lahko pa še vedno pride do problema
+pazi se timezonov takoj k delaš z timezouni
+
+//vsak teden mi zalafi backup
+to je konec
+
+TOU,TOC se vedno velja bi se to moral fixat
+
+to je neverjetno uporabno ko delaš mission critical zadeve, koda pravilno spisana in preverjamo da ne gre nič narobe
+
+
+
+01.c primer
+
+preveri če je input večji od 128 bytov
+najlažji primer rešitve -> fgets(name,128,stdin)
+fgets tudi zagotavlja da bo dal \0 na 128. mesto
+
+
+preverimo če dobimo sploh alociran prostor(lahko zmanjka pomnilnika)
+
+if (name == NULL){
+	fail
+	return 1
+}else: 
+	nadaljuj
+
+
+fgets vrne NULL če nič ne vpišemo ali pa pride do problema!
+kaj se zgodi z bufferjem v katerega pišemo?
+- še kaj je lahko notri in poleakamo informacije -> treba je preverit še če je fgets == NULL
+
+if (fgets(name,128,stdin) == NULL){
+	fail
+	free(name) //nujno je treba še sprostit pomnilnik (memory leak)
+	return 1
+}
+v našem primeru še returnamo ven iz maina in bo sam os počistil, če je pa to neka funkcija se bo pa samo nabiral
+
+
+gremo naprej na //Open file
+
+lahko se zgodi da ta file(dobimo ga preko argumenta) ne obstaja.
+lahko bi spet try catch errorje dal in bili veseli!
+da pogledamo če se datoteka uspešno odpre
+pogledamo man fopen()
+če je uspešen vrne file pointer, drugače NULL
+
+
+if (input == NULL){
+	printf("napaka")
+	free(name)
+	return 1;
+}
+
+ampak s tem ne vemo kakšna napaka se je zgodila (file ni obstajala, nismo imeli pravic, je file system kriv)
+nujno potrebujemo pogledat error
+v man piše da se spremenljivka errno -> nastavi na ogromno že vnaprej napisanih napak
+
+zato je potrebno preverit še errno
+if (errno == ENOENT)
+	printf(neki)
+else if (errno = EAcces)
+ali pa še izpišemo še errno in je sama napaka, je pa treba po dokumentaciji include dodat
+
+<errno.h>
+
+
+kateri file pa odpremo?
+(ni nujno da je sploh podan) -> dobimo preko argumentov v main
+fino je preveriti na začetku če sploh obstajajo argumenti
+if (argc != 2){
+	printf(ni dveh argumentov)
+}
+
+
+zakaj 2, kaj je vedno prvi argument v programu?
+vedno je 1. ime programa, 2. je pa naš name (argv[1])
+
+
+kaj je pa narobe pri //Get file size
+
+kaj dela fseek -> pogleda kakšen je filesize in pogleda če je večji od 10
+
+kaj naredijo zgornje 3 vrstice
+prvi fseek ga premakne na konec programa
+ftell pove kok je velikost in tako dobimo size
+fseek pa potem spet nastavimo na začetek da začnemo z začetka programa
+
+
+takoj vidimo da smo size nastavil kot int, ta majstr pa vrne long, opala!
+ftell vrne -1 v primeru napake zato ne smemo imeti unsigned long 
+
+in spet je treba v primeru napake free(name) in fclose(input)
+
+fseek lahko prav tako kot ftell vrne napako in še to preverimo
+treba je preverit oba fseek, wow kok dela!
+
+if (fseek(input,0,SEEK_END) == -1)
+ 	fclose(input)
+	free(name)
+	nek print
+	return 1
+
+
+
+tisto množenje k gleda > 10*1024 na 3 //10GB je int to bo pa overflowal ker ima samo 2147....
+
+(long)(10*1024 na 3) v oklepajih je še vedno int
+
+zato je treba razdelit
+
+(long)(10) * 1024 na 3
+ali pa lepše: 10LL * 1024 na 3
+
+
+tudi tuki je treba free(name) in ne zapremo fclose(input)
+
+
+gremo na branje file-a
+
+vse kar prva stvar naredi je le da prebere številko
+
+če zadeva ni cifra se bo pritožil, vrne EOF
+
+
+if (fscanf(input,"%d",&len) != 1){ //fscanf bo vrnil tok kokr je vnosov, mi imamo samo enega
+	napaka itd. free fclose
+}
+
+
+spodaj je spet treba pogledat če je entries == NULL
+potem gremo čez vse entrie
+
+treba je pogledat če smo prišli do EOF, zato spet prevermi != 1 in zdaj moramo še entries zapret
+
+
+int avg = sum/len; //spet lahko pride do deljenja z 0
+
+spet je treba preverit če je len == 0 zapremo vse 3 free,free,fclose
+
+
+gremo še na //Do stuff
+
+
+gremo čez prvih 10 entriev
+- poljubnega si izbereš
+- lahko ga spremeniš
+
+kje je tu problem?
+scanf mora vrnt 1 zato spet preverimo != 1
+ko je uspešen pa dobimo neko številko, nek entry, kakšen mora biti
+- še vedno mora biti index array-a < 0 ali pa več ali enako len
+
+
+in pri zadnjem scanf je spet treba pogledat če se je pravilno zalaufal != 1
+
+
+na koncu moramo pa še vse sprostiti, enako kot smo ves čas do zdaj delal
+
+in zdaj smo prišli na 160 vrstic koda je absolutno neberljiva, pri vsek seek in tell se eror number nastavlja se lahko bi razbil in dodelal, pa še vedno nismo čisto vsega preverili
+
+
+char je velik v memory 1byte, če bi bil v UTF-8
+
+//GET name
+char * name = (char*)malloc(128 * sizeof(char))//
+
+fino je še castat char* ker tako malloc deluje
+
+
+tudi pri vseh if- se lahko neki zgodi
+
+kokr se potrudiš toliko jih boš našel
+
+na enih točkah sprintaš zadeve na določenih je treba freejat
+
+iz ene male funkcije smo dobili nekaj velikega
+
+
+
+pri teh low level sistemih se uporablja nek GOTO , naj se ga ne bi uporabljal
+
+kot neke mini funkcije na te cleare in pogleda kje si in avtomatsko vse za nazaj pocleana...
+
+treba je najti nek kompromis! -kernel driverji compilerji (mora vse biti natančno določeno, podrugod kokr ti paše)
+
+v nadaljevanju bomo šli bolj na cyber sec zadeve

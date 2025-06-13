@@ -1,0 +1,203 @@
+kaj smo imel:
+nek buffer in smo prisli do canarya k smo ga lahko pokvarl
+taglavn je bil pa ret addr
+
+
+da vidimo stack obstaja ukaz x/10gx $rsp
+kje se a in b nastavita?
+kaj sta -> vhodni spremenljivki(parametra)
+
+-> te podatki so v registru!
+
+objdump -d main | grep '<win>' -A 30
+
+
+s tem lahko vidimo kaj naj se bi dogajal tm gor
+vidimo da neki primerja kar pomeni da je to to!
+
+kaj je rax -> splošno namenski register!
+Kje smo ga pa nastavil? -> 
+
+
+rax je bil 64biten
+manjsi je eax > ax > ah > al
+
+aha filamo ga v eax ker ne potruebuje celo velikost 
+
+kam pa kaže base pointer?
+
+npr k smo v neki funkciji -> 
+ - stack pointer vedno kaže na "vrh" stacka 
+ - base pointer pa na dno oz. vrh kokr gledas
+
+ko poklicemo novo funkcijo se samo 2 dva premakneta dol ker se druga funkcija doda
+
+
+poglej prvo slikco
+
+rdi in rsi se nalozita obe spremenljivki
+kaj ta rdi in rsi -> standardni registri po katerih se elementi posilj
+
+
+
+kako lahko zdaj zafilamo te registre preko simple gets
+
+da vrnemo snipete kode se imenuje ROP
+return oriented programming temu se rece gadget
+
+ukaz ROPGadget --binary main
+ lahko dodamo tudi grep npr.
+ | grep 'pop rdi'
+
+
+addr
+bp
+AAAAAAAAAAAAAA...(buffer)
+
+
+kje se addr in bp dejansko uporabi -> 2 ukaza
+leave -> (pop $rbp) 
+ret -> vrne ret addr (pop $rip)
+
+
+kaj pa naredi pop -> spremeni in da se premakne
+
+nakratko oba se samo premakneta gor sp prvo kaze na bp nato na addr in potem se eno visji -> to sam popa to vse dol
+
+tako smo prihajal do wina, ampak tokrat nam win ne dela
+
+gledamo tiste vrstice, moramo imeti pop rdi in return
+
+
+
+če damo namesto win tega notr ki sam naredi -> pop rdi;pop rbp; ret (ki pa je v bistvu pop $rip)
+to je nek random snippet kode na 40384d v mojem primeru
+
+zdaj stack pointer kaže sem pred buffer kaj bi dal takoj na zacetek bufferja -> DAL BI TISTO NASO SPREMENLJIVKO KI JO POTREBUJEMO "deadbeef"
+dejansko smo hotl ta 2 registra zafilat z Nasimi vrednostmi in tako se te 2 spremenljivki data gor
+
+ampak mi rbp ne filamo zato sam damo neke random "CCCCCCC" notr
+potem nam ostane pa samo se ret -> ce bi zdaj skocil na win ali bi delovalo?
+
+NE BI BILO DOBR, nismo se b nastail
+zato nocem se win, zato hocem se en gadget -> potrebujemo pop rsi in grepamo
+
+
+ROPgadget --biary main grep 'pop rsi' | grep 'ret' da dobimo skor vse kar hocemo
+
+za je za nas 403b8a slikca
+
+v tem pa imamo pop rsi; pop rbp; ret
+v rsi hocemo dati badcoffee
+
+in ko je to obje nastavljeno gremo v win ker imamo registre pripravljene
+
+
+
+
+
+nakratko:  
+prvo gremo v mainu 
+leave -> pop $rbp
+ret -> pop $rip
+---------------------
+prvi snippet
+pop $rdi
+pop $rbp
+ret -> pop $rip
+---------------------
+drugi snippet
+pop $rsi
+pop $rbp
+ret -> pop $rip
+----------------------
+kličemo win
+
+
+
+STACK
+win
+DDDDDDDDDDDDDDDDDD
+0xbadcoffee
+0x403b8a
+CCCCCCCCCCCCCCCCCCCCCCC
+0xdeadbeef
+addr: 0x40e8bd
+
+
+
+
+ko gadgete skupaj chainamo to imenujemo ROP chain
+x/20gx $rsp
+
+prvo smo pogledal katere registre on zafila in preverja in smo dal nase stvari tja notr
+to smo pa dosegli tako da smo uporabljal gadgete da smo sami zvedel kodo vmes
+rdi in rsi smo zafilal 
+rbp smo krneki notr dal
+in z ret smo usmerjali cel tok
+
+
+
+zdaj imam pa še eno foro za nas
+kaj pa če bi mi samo skočil na 6.to vrstico, zakaj pa skačemo na začetek win-a?
+že cel cajt smo skakal na sred oz konec neke random funkcije(gadget)
+
+objdump -d main | grep '<win>' -A 30
+
+
+preden se puts zalaufa moramo nek premaknt tist mov nad oznacenim (GLEJ SLIKO)
+in se lea je move addr ki ga potrebuje za ta puts
+takoj po jumpu moramo skocit
+
+
+ni treba vedno tok prevec razmislat -> lahko samo skocis na win in to je to AMPAK 
+
+
+
+zdaj pa odremo pwn 6 ki je zelo podoben setup, brez problema preskocimo prvi if in tam ni returna da bi lahko naredili tako kot hocemo, se vedno bi morali za b nastavit rop
+
+
+zdaj poiščemo samo enega za rsi
+
+dobimo nekega pop rsi in ret
+to je vse kar naredi
+
+
+
+objdump -d main | grep '<win>' -A 30
+
+
+
+zdaj smo basepointer sesul 0x424242424242
+
+kam bi moral kazat? RBP bi moral kazat na začetek sp pa spodaj na kocnu
+in ko gremo v funkcijo se zamaknje sp gre dol rbp gre pa tam kjer je prej bil stackpointer 
+in ko se vrnemo gre nazaj
+rbp gor in sp tja kjer je bil prej rbp
+
+
+kaj smo pa mi naredili:
+stack pointer smo dal tja kjer rbp kaže 
+rbp smo pa prebral iz stacka in smo ga dal na 'BBBBBBBBBBBBB' oz 0x4242424242
+crashne zato ker tam ni nic memmorya
+
+
+moral se bi pa nastavit na leavu (na koncu funkcije)
+
+
+
+f(){
+bp,sp
+////////////// -> sem smo pa prišli z našim klicem in smo skipal prvi bp in sp
+bp,sp
+}
+
+
+včasih gleda kot da lahko skipamo kaksen del kode, odvisno od tega kako se funkcije uporabljajo
+
+rešiš enako kot 1.nalogo
+
+
+
+
+

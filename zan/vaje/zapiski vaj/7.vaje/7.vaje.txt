@@ -1,0 +1,312 @@
+7.vaje
+web_3 in web_4 datoteki
+
+kako web_3 nalozi sliko
+sudo systemctl start docker
+sudo docker compose up -d
+
+imamo tudi druge loge docker logs storitev_dockerja
+da jo dobimo pa nucamo ps
+
+takoj ko imas / gre na webserver -> takoj ko pa imas http: pa gre nekam drugam
+
+
+v nasem primeru pa bo slo kam?
+
+src="/images/https://neki_neki"
+
+to pomen da gre na isti server pogledat folder images in nato nekam drugam na nek drug server
+
+ce gremo pri nas pogledat @app.route('/images/<path:path>')
+in ta samo pobere sliko iz nekega drugega strežnika
+
+
+npr discord vse linke k jih das k zgledajo k slike bo probal preko svojih serverjev najdt in prikazat
+tudi pobrise dolocene attrib o geolokaciji itd...
+
+
+Kaj lahko mi delamo z tem requestom?
+
+1.	(kriv exploitan server) 
+preko česa smo poslal request na google?
+PREKO SERVERJA!
+
+http 'localhost:8080/images/https://google.com' -> npr. ta server bi bil kriv za vse proxy napade ker se bi dogajali preko njega
+
+fakaš request k se dogajajo drugod ker mi dovolimo preveč passthougha
+
+2. 	NETWORKING ISSUE (dostop in kakice na privat okolju)
+gor smo lahko posiljal na public internet kam se lahko posiljamo?
+kje je ta server? ponavadi je do serverja polno neki switchow in rootov. Kaj je na koncu?
+
+PORT FORWARDING -> isto kot na strežniku
+ponvadi so te storiteve na nek rooter povezane in se forwarda porte da naj npr na 443 in 80 gre na ta server
+
+na private mreži se vsi vidijo -> (iz public itak ne mores)
+
+in tako pridemo do ostalih naprav? (network issue -> kako so zadeve na omrežju ločene)
+
+npr nek ransomware na neko spletno stran in okuži vse kompe v podjetju
+
+V domači uporabi to ni kritično. Kaj pa v firmi ki laufajo svoje serverje?
+-> odg: sam še več serverjev -> vse mora biti pri njih na enem mestu tudi vse ostale storitve
+
+dostopamo do private endpointov, routerja (če ima slabo geslo laufamo naše zadeve).
+
+Pri firmah sta 2 opciji kako laufajo svojo infrastrukturo.
+
+CLOUD DING DING DING
+ali pa smrdljiva soba z mrvimi komarji in dvemi klimami
+
+
+na cloudu se še bolj zakomplicira
+zadeva da z cloudom dobiš meta podatke o serverju -> OBSTAJAJO NEKI METADATA SERVERJI
+
+če iz serverja iz clouda pošljemo na nek specifičen IP//wildcard/multicast/anystact neki od tega 
+da lahko iz serverja naredis request in zahtevas neke specificne podatke
+VPC -> virtual private connection, o kakšnih servicih k laufajo s katerimi acc, kakšen internet -> meta podatki overall
+
+kaj se zelo pogosto zgodi? -> narediš request da se ti token zgenerira (authentication token (web4))
+
+preko njega lahko delaš requeste na druge stvari in če token pošleš zraven bo storitev samo rekla OK. BOMBA
+
+
+
+to se je zgodil capital one banke
+IAV je bil basicly tole (initial attack vector)
+
+
+
+3. BRANJE OSTALIH DATOTEK NA STREŽNIKU (za iskanje lukenj/skrivnosti)
+
+npr ne bi imel dovoljenja dostopat do nasega preko tega pa bi lahko-> s tem po img/https: ....
+
+
+
+CURL
+kaj zahteva da se mu pošlje kot argument?
+- nek url
+
+<protocol>://<location>
+kaj vse je pa lahko protokol? http, https, FTP, ...
+
+file:// direkt file odpre
+
+npr ls dockerfile
+
+realpath
+
+curl lahko izpise nek file samo ce imas realpath, curl bi lahko potem zacel izpisovat datoteke
+
+ce bi to polaufal na strezniku bo zalaufal nek file-> in tako lahko gledamo file pod serverju
+
+npr. /etc/shadow in bi lahko vidl hash passworda (ce je common je broken in je skill diff)
+
+http:localhost:8080/images/file:// /ap in bi poleakal cel file bi lahko potegnil nek secret iz datoteke ven
+
+
+kaj je zaščita proti tem?
+sanitizacija -> ne spustimo vseh protokolov
+oz. probamo ne z shellom laufat zadeve
+
+npr python knjiznice request -> get zadeva iz tm in tm in dobis celo
+
+
+psevdokoda:
+
+res = request.get(path)
+return res.content
+
+
+//ker smo uporabil kunkretno knjiznico nam ne pusti vec fila uporabljat ker je narjen samo za web request
+se vedno pa lahko delamo druge requeste
+
+kako se bi tega lotili?
+
+kaj naredimo da requsti ne gredo samo na interno mrežo ampak samo na externo
+
+lahko bi omejil samo določene domene, npr. discord da bi lahko samo preko google images lahko videl
+yahoo images pa ne -> folk se bi pritozil
+
+
+Lahko pa blokiraš lokalne naslove KAKO?
+
+brez problema lahko sampo pogledamo domeno ? in če je nek public ip
+
+ponavadi se laufa samo nek if k gleda če je 127.0.0.1 -> lahko uporabimo arkol druzga kot lokalno domeno
+0.0.0.0 deluje ali pa 127.1 ali localhost -> prevec jih je in jih je problematicno gledat
+
+če se domena resolva pa rečemo ok -> če dns reče da ima record za to? je to dovolj za nas?
+
+če domena google.com obstaja 
+če bi pa dal neki druzga pa bi rekl da ni ok ker ne obstaja
+
+
+lahko da ima nekdo domeno na 127.0.0.1 in deluje ampak se še vedno resolva na localhost
+
+
+Ena stvar k so jo predlagal na prejsnih vajah:
+
+if dns.resolve(path).isInternal(): return error
+else request.get(path)
+
+//TO je zelo dobra resitev ampak ni popolna
+
+za resolve pogledat sam daš dig "localhost"
+
+
+
+tuki mamo en drug problem. Ko request naredimo se bo se enkrat resolval in poklical request
+
+to pomen da med dns.resolve(path).isInternal()
+
+lahko bi pa na dns nastavil da naj se resolva na localhost 
++ se ena pomembna zadeva TTL -> time to live -> kok cajta se bo zadeva cachala potem
+
+če naredimo en entry TTL=0 
+in mamo 2 inputa ena ga daje na private ena na public
+
+in potem se to vse obrne
+
+prvi check bo uspel ker bo videl public ip, ko bo pa zalaufal cel request se bo pa ze dns spremenil na private ip
+PA SAJ TO JE NORO. (never ending battle)
+
+
+
+
+
+TE CELI ZADEVI SE REČE SSRF 
+SERVER SIDED REQUEST FORAGING
+
+
+
+gremo na primer web_4
+
+avtentikacija
+
+
+kaj dobimo od serverja ko se avtenticiramo?
+COOKIE
+
+
+ali pa PHPSESSION -> kaj je bil content?
+Sid 32B
+
+
+zato smo si izmislili zadevo JWT?
+
+kako server ve da je JWT dejansko pravilen?
+
+kako JWT izgleda
+
+header -> algor in typ
+data/body/payload -> id, username, email
+s private key narejen podpis/signature
+
+public key in header/payload podatkov preveri signature
+user ima vse podatke na voljo in jih lahko vidis -> lahko editas ampak ne mores pa signitura oz. bo bil takoj napacen
+
+ta signature tako generira da podpise podatke od header/payload in ko ga validira vidi če je ok oz. spremenjen
+
+
+
+v primeru da je valid -> ne gledamo v bazo ampak lahko podatke direkt iz JWT preberemo
+
+ogromno JWT serverjev imas in vsak pogleda kdo si in vsi vejo kdo si
+
+express isto kot flash v python
+morgan sam izpisuje stvari ok za debugging
+
+kaj je middleware?
+ko pride na server request se polaufa nek function in lahko dela karkoli
+middleware je nekje vmes preden se bo ta function klical bo sel cez middleware in bo nekaj naredil pred njo
+
+pogleda ali je JWT veljaven, če je spusti do javascripta , če ni že lahko na tej točki reče da ni ok in odgovori in niti ne pride do naše funkcije
+
+
+
+middleware lahko tudi obdela podatke od uporabnika do funkcije in obratno tudi loggi se tuki dogajajo
+
+
+
+kaj naš dela?
+
+pogleda če je prav request in imamo piskotke naredi token/sejo
+in če token obstaja se ta payload naloži, če se zgodi napaka nam console.loga error
+
+in povsod returnamo next()
+
+zakaj ne poslemo 401? unauthorized -> naša apk to že naredi
+
+
+jwks standard ............
+
+
+
+
+vidimo da imamo že acc narejene
+
+guest, guest
+
+in pogledamo podatke na browserju
+jwt debugger vidimo vse in lahko tudi spremenjamo ce bi dal 1 in admin pa signature ne bi bil pravi
+
+
+
+ce to spastamo notr in gremo na spletno stran nam strežnik servira za admina
+kje se preveri JWT?
+
+treba je zracunat podpis -> JWT + public key
+
+11. vrstica samo decodaš in ne verfyaš in če hočeš veryfyat moramo to malo sprement
+
+dodamo eno knjiznico
+
+const jwt = require("jsonwebtoken");
+
+
+req.user = jwt.verify(token, config.PUBLIC_KEY, {
+	algorithms: config.JWT_ALGORITHMS
+}):
+
+
+DECODE != verify -> samo pogledas ce je kje public key in ce ga ni je zadeva svoh!
+
+
+2. problematicna zadeva je
+
+
+eden izmed algorithmov je none ki je včasih dovoljen
+
+včasih lahko samo none nastaviš in gre zadeva čez
+
+eni uporabljajo asimetrične ključe, drugi simetrične
+
+uporabil bo tistega ki je v glavi?
+
+potrebujemo signature in public key za validacijo -> če spremenimo algo iz RS256 na HS256
+#1 signature ni več valid.
+zdaj pa lahko popravimo naše payload podatke in zdaj se bo uporabil algoritem HS256
+
+
+in tako uporabi PUBLIC KEY za svoj simetričen ključ
+in tako lahko kot uporabnik ti sam preko tega tudi zgneriraš signature in je zadeva cist valid
+
+(key confusion attack) ZELO POGOST
+
+
+
+nek jwt tool je uporabil
+in s tem je kreiral nov kluc z svojim zelenim algoritmom z enkripcijo 
+odprl jwt debugger in pogledal da je vse ok in nato je se sel v app in nastavil svoj ta token notr in spet je bil loggan in kot admin
+
+
+JWT je super zadeva, ampak pazi na standardne napake.
+
+
+se vedno bo server sel gledat svoje shranjene in bo problemcek // poglej ce hoces
+
+
+
+kaj bi bila zaščita za to? 1. omejimo algoritme katere lahko uporabimo
+prva pametna knjiznica pogleda key in vidi da ne sme nucat simetricnega in tako laufa naprej
