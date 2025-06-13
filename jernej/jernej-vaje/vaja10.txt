@@ -1,0 +1,132 @@
+def_5
+
+gremo en korak višje v defenzivnem programiranju
+
+probal bomo zascitit tujo kodo -> imamo orodja, ki laufajo kot overlay, ki gleda kako deluje program
+
+dva orodja -> seccomp in landlock
+
+seccomp -> omejuje sistemske klice (ko probamo uporabljat program, mu določimo katere klice (pravila) lahko uporablja). Poleg omejevanja sistemskih klicev lahko omejujemo tudi katere argumente lahko znotraj sistemskega klica uporabljamo. recimo pri write omejimo velikost na manjše od 64
+
+cat.c -> prebere kar je v fajlu in printa. napaka? imamo overflow, ker fgets prebere 1024, buffer je pa samo 512 velik
+
+namest da kodo spremenimo spremenmo filtre in pravila, da se to ne more zgodit
+
+gremo v protect.c -> zaenkrat prebere in zalaufa stvari, pol pa execa program
+
+primer zagona: ./protect ./cat exploit.txt
+
+kako delamo s seccomp?
+tri dele: 	1. naredi seccomp kontekst, ki mu dodamo(seccomp_init)
+		2. naložit pravila
+		3. naloadat celo zadevo (seccomp_load)
+	
+1. seccomp init ("man seccomp_init" za pomoč)
+
+ctx = seccomp_init(SCMP_ACT_KILL); //to je default, torej če ne paše v nobenga iz ostalih rule-ov se to izvede, v tem primeru KILL
+
+
+
+
+koda:
+
+scmp_filter_ctx ctx = seccomp_init(SCMP_ACT_KILL);
+
+kere rule pa rabmo? branje iz datoteke, pisanje na zaslon, odpiranje datoteke in zapiranje(čeprov tega v kodi ni)
+
+seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(read),0);
+seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(write),0);
+seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(open),0);
+seccomp_rule_add(ctx, SCMP_ACT_ALLOW, SCMP_SYS(close),0);
+
+
+in zdej rabmo naloadat
+
+seccomp_load(ctx); //nalozimo in naša pravila veljajo za naš program
+
+ajde zalaufimo.
+./protect ./cat ./cat.c
+crasne, core dumped. kako vemo kaj je narobe? uporabmo strace da vidmo system calle
+
+strace ./protect ./cat ./cat.c
+
+vidmo da je seccomp(SECCOMP_SET_MODE_FILTER) vrnil 0, vse je blo ok, pol je pa na konc neki se sesul
+
+razlaga: takoj k je naloadan se začne izvajat, torej preden se sploh program konča (naš execv se more še izvest, mi pa nismo v pravila to vkljucil). rabimo omogocit izvajanje (execv) sam to se zdej ne ujema z našim rulesetom k ga hocmo ce bi to tm gor dodal še 5. pravilo
+
+ajde dejmo ga za foro notr, in pol hoce spet neko drugo pravila in bomo 10 pravil dodal. ogromno enih syscallov se izvede tudi pri simpl programu -> razne memory zadeve, itd
+
+loh uporabmo SElinux, s katerim loh pisemo profile in loh tud v loge pogledamo in tam zapiše kaj rabmo
+
+z strace zdej vidmo kaj bo raibl
+
+strace ./cat cat.c 2> /tmp/profile
+
+z tem bomo dobil use sys calle zdj:
+
+cat /tmp/profile | cut -d'(' -f1 | sort | uniq
+
+in zdj za usazga nredimo comp add 
+sam zdj mamo execv notr. kako bi omejil da ne mormo nekh drugih stvari execat ampak samo cat. v execve je to notr. na kaj bi ga pa omejil
+
+
+oomejitev: na prvem argumentu od execve
+
+scmp_a= (SCMP_cmp_eq, (long)argv[1]
+
+to je prva omejitev seccompa
+
+apparmor -> securanje setupov brez programirianja (svoj kerrnel module)
+
+
+landlock------------
+
+kernel.org
+
+kako se razlikuje od seccomP?? -> seccomp omejuje sistemske klice, landlock pa filesystem in netwrk (
+
+vsi calli z filesystom/network gredo čez landlock in se vse pregleda
+
+mi se bomo ukvarjal z filesystemom
+
+gzacetnj ne 
+
+
+ce karkol triggeras se bo sesul
+ker rule bomo spreinjal'
+
+mi hmocmo use omejevat, sato 
+
+nas ruleset je execute in write file
+
+
+mi rabmo landlock_rule_path_beneath(struct iz allowed Access in parent ds)
+
+allowed_access smo ze mel
+
+kaj bomo pa za parent_fd dal? -> vse pod parent fdjom je dovoljenjo z tem Accessom. parent fd bo torej nas working directory, za katerega rabimo open file deskriptor, kar pomen da ga bomo rabl v kodi odprt
+
+char path[4096];
+getcwd(path, sizeof(path));
+int cwd = open(path, 0_PATH);
+
+path_attr ={
+
+	allowed access=
+	LANDLOCK_ACCESS_FS_EXECITE
+	LADNLOCK_ACCESS_FS_READ_FILE //TE 2 BOMO DEJANSK CEZ PUSTIL
+	parent_fd = cwd
+
+}
+syscall(SYS_landlock_add_rule, landlock_fd,  LADNLOCK_RULE_PATH_BENEATH, &PATH_ATTR, 0)
+
+prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)
+syscall(SYScall_ladnlock_restrict_self, landlock_fd, 0);
+
+
+kernelorg landlock page
+
+če pravila ločimo loh izvedemo res en specifični program
+
+
+

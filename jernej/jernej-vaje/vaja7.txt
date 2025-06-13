@@ -1,0 +1,75 @@
+web3 nadaljevanje
+
+kaj je naredu link v post-u -> sliko
+
+kje loh poglledamo kako se je slika nalozila? v img elementu v html
+
+/images /new -> to je use na našem serverju
+pri sliki pa vidmo da je src /images/htttps://via.placeholder.com/150. To gre na naš server, kjer mamo route za to (to ni direkt na drug server)
+kaj to pomen? gre na naš web server v /images/<path:path> route
+
+v kodi vidmo da naredi curl nad tem path in v našem primeru gre na ta link (server torej vzpostavi povezavo s tem drugim servejem (ni direktne povezave med klientom in tem serverjom)) dobi sliko in jo un server pošlje našmu serverju in pol naš server odgovori s to sliko
+
+kaj loh zdej mi naredimo s tem requestom?
+
+http 'localhost:8080/images/https://google.com'
+ta request je naredu server. prvi k bo najebu je ta k ma server čez. torej oni bi bili toženi loh, nek zlonameren heker pa ne. kam loh še requeste delamo? zaenkrat smo sam na public internet. sam ta server k dela requeste loh dela request tut na njegove naprave v lokalni mreži
+
+nevarno je tut če do multicastov dostopaš, ki jih ma večina cloud providerjev na teh serverjih (na primer generiranje tokenov, dostop do privatnih povezav)
+
+3. stvar -> uporablamo CURL, kaj gre loh narobe? curl rabi argument, ki je URL. URL je <protocol>://<location>
+
+in ena opcija je file://
+torej z curl loh izpišeš file uh oh
+
+server je pa tisti ki curl zalaufa!!!
+
+tako loh poleakamo cel program k to tut izvaja
+
+zaščita: ne pustimo laufat stvari iz shell-a. v pythonu je za to recimo knjižnica request
+
+kako omejit da nemore it na interne domene? res = requests.get(path)
+						reaturn res.content
+
+sam s tem loh sezmer delamo interne requeste poleg eksternih.
+
+if dns.resolve(path).isInternal:
+	return error
+return requests.get(path)
+
+SSRF -> server side requeste forgery to je to kar mi delamo
+
+web4
+
+maš phpsession cookie za sejo, ki hrani id, username, email
+
+JWT -> zgenerira token namest PHPsessid. kako pa server ve da je JWT taprav? maš header, payload in podpis. to posle server.
+v headerju mas algoritem in type, v payloadu pa poslemo podatke od uporabnika (id, username, email). server pol ne rabe gledat v bazo za sejo (kjer ma id, username, email) ampak sam preveri če je JWT valid. -> user mora header in payload združit in zašifrirat s javnim ključem in server sam pogleda če je podpis enak
+
+
+na vrhu mamo include
+
+PORT, HOST izluščimo iz module exports
+
+JWT middleware (kaj sploh je middleware? preden se funkcijo poklice gre request na middleware) - v middleware recimo preverimo, če je JWT veljaven, če ni ne pošljemo na funkcijo ampak sam error poslemo
+
+guest guest loh poslemo in vidmo v session cookie en value in to damo v jwt.io in vidmo zdej podatke k so hranjeni notr
+
+spremenmo ta payload na admin. vidmo da zdej ne bo več evaluiral se pravilno na jwt.io, ker je signature sezmer isti!!! signature se bi spremenu ko se spremeni payload, mi pa nevemo kakšen bi mogu bit.
+sam zdj ns je notr spustu ce smo notr dal admin payload
+
+ker je v verifyToken sam dekodiran, ni pa uporablen verification
+
+req.user = jwt.verify(token, config.PUBLIC.KEY, { algorithms: config JWT_algorithms, });
+
+damo namesto req.user = jwt.jwt.Decode(token)
+
+decode != verify
+
+še en problem je JWT_ALGORITHMS, kjer maš loh NONE algorithm in gre zadeva sam čez
+
+še en problem -> verify se polaufa na podlagi kerga algoritma? mi jih mamo več. ker se polaufa? tist k je v glavi
+ce gremo is RS256 na HS256 ni več signature valid, loh pofejkamo signature z našim public keyom ker je HS za simetrično kriptiranje (kar pomen da loh uporabmo public key, ki ga ne bi smel, da validiramo naše podatke, z njim smo pa tut šifrilal pr generaciji JWT).
+
+
+zaščita? -> omejiš algoritme na samo RS256 (ker smo tako mi definiral našo kodo na podlagi tega algoritma)

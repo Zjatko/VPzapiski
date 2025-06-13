@@ -1,0 +1,137 @@
+kategorije napadov:
+
+1. spremembe binarnih datotek (sfukat hocs workflow)
+2. web (spletne strani)
+3. reverse engineering (od javascripta, do low level kode)
+4. vse skupaj - varno pisanje kode
+
+sa Linux
+
+main.c:
+
+#include <stdio.h>
+
+int main(){
+	printf("Hello world\n");
+	return 0;
+}
+
+
+gcc -o out main.c
+
+//v main.c koda notr
+
+
+./out dobimo
+kaj pa je to?
+file main.c //ukaz da vidmo da je main.c ascii text file
+file out //binarna datoteka (binarne dat so sestavljene iz segmentov, ki imajo svoje podatke: RO samo read-only podatki (statični podatki, ki se ne spreminjajo, tukaj notri je "Hello World"), RW, text (kle notr je funkcija main recimo, dejanska koda), heap, start.... not stripped pomeni da ima dodatne helpful podatke. Vsi segmenti skupaj so ELF datoteka (executable and linkable format) -> ko OS zažene program ve kaj more narest z programom, da ga ustrezno zažene. Kje se začne pa koda izvajat (prva funkcija v assemblyu)? Še pred main-om mamo funckije (pričakujemo da bodo libraryi ustrezno notr, da bodo argumenti pri zagonu bli že). V c-ju imamo za to še runtime (ki postavljajo te stvari PREDEN se main začne izvajat lahko)
+
+_start //to je pa prvi label, ki se bo polaufu, poklicu bo __lib_start_main()
+__libc_start_main() //ta funkcija je prva! potem šele on kliče main.
+main()
+
+
+kako pa to zadevo pogledamo?
+objdump -d out //-d je dissasemble, out je ime programa
+
+to izpiše celoten text segment (kar je dejanske kode tukaj notr)
+
+v dissasemlbyu zdej vidmo nek init in plt, in v plt je puts
+puts je funkcija za put string (ki je naš printf), sam zakaj? ker je optimiziran in mi nimamo formatinga ki ga printf podpira, zato ga z puts zamenja
+
+v .text sectionu vidmo notr to našo kodo. in prva stvar je _start, v katerem vidmu main in klic za __libc_start_main
+
+pol globje mamo pa še main (vidimo call na puts (naš printf))
+
+kaj ubistvu naredi -> zagrab rax in ga da v rdi
+
+branje v c -> scanf
+int n =10;
+scanf ("%d", &n); //scanf more bit zmožen to zapisat, zato mu mormo poslat KAM more zapisat ta vnos, zato mu daš address kjer se n nahaja
+printf("%d\n", n * 3); //kle pa spet navaden n (samo value rabiš izpisat)
+return 0;
+
+kje v pomnilniku se bo rezerviral prostor za n? na stack-u, 4B
+
+če pa nič ne vpišeš pa sam ctrl+d daš bo pa sezmer vrnu 30(3*10) (scanf sam preskocu) zakaj preskocu? ker če ne more pomatchat to kar rabi sam skipa(za nas int). Sam to je loh zdej problem, kaj ce nismo inicializiral n? dobimo 0, sam zakaj? ker dobimo tisto kar je tam na n bilo rezerviran, če ni blo 0 pol je 0 drgač pa pač neki kar je tam gor? problem -> to loh neke podatke vn poleaka!!! ker nismo nč overwrital. Primer iz prakse -> openssl heartbleed attack so bral podatke ki jih nebi smel, ker niso nc povedal kaj hocjo pa je streznik vracal nazaj podatke iz memorya
+
+
+
+zanimivi so tud stringi
+
+printf("INFO %s\n", "Burek");
+
+haha sam kaj pa ce hocmo prebrat
+
+char str[10];
+scanf("%s", str);
+printf("INFO %s\n", str);
+return 0;
+
+sam kaj pa ce zdej ctrl+d, stringi se morjo z \0 koncat -> to je samo byte 0 (0x00). Torej če maš notr 0 v pomnilniku se ne bo nič izpisal. ČE JE PA NEKI DRUZGA KLE NOTR BO PA SAM ŠOPU PODATKE
+
+kaj pa ce mamo vec k 10 znakov -> se pritozi in crkne ampak čak mal, prvo se izvede POL PA PRITOŽI, kar pomen da bo neki tm notr naprej neki prepisal. če pa ful znakov naspammamo notr da ma segmentation fault na stacku
+
+kako pa stack deluje?
+
+na stacku so lokalne spremenljivke za funkcije (maš frame-e (okvirje) da veš kera funkcija ma kere spremenljivke)
+
+kako ves kam moras it iz funkcije, da greš spet na prejšno funkcijo in greš eno naprej (program counter ane premikaš) -> maš return pointer, da veš kam more pol it v prejsno funkcijo
+
+gdb out -> pwndbg plugin še dol potegn za njega 
+
+izpiše nam tudi stanje ko je crashal, ne sam da se je crashal program
+
+ret - returna iz funkcije na prejšnjo funkicjo, podatek za to je pa na stacku
+
+LOH VIDMO DA JE HOTU SKOČT NA 0X41414141414141 (main je hotu kle skoct) kar so sami A-ji, ki jih naspammao za scanf notr in tuki se je sesul.
+
+kaj smo pol ubistvu naredil? če ful A-jev naspamaš bo to šlo tok gor po stacku, da pride do return adressa in ga nafila z A-ji. in hotl smo skočt izven naših segmentov -> segmentation fault
+
+kaj je nevarnost? loh skocimo nekam u pizdo  in izvajamo nek drug program!
+
+python:
+
+***
+from pwn import *
+p = gdb.debug('./out', 'b * main') //breakpoint na main
+
+payload = b'AAAAAAAAA'
+payload += b'BBBBBBBB'
+payload += b'CCCCCCCC'
+payload += b'DDDDDDDD'
+
+p.sendline(payload) //pošle payload
+
+p.interactive() //loh delamo neki
+
+***
+
+kaj je ta payload? velk string nardimo in poslemo
+
+
+c je continue, in gremo dokler ne zadanemo breakpointa na main
+ni next instruction, pocas skacemo
+v scanf bo slo to iz skripte (payload) notr
+
+backtrace -> vidis kam bo šel po zaporedju nazaj po funkcijah gor
+
+in mi smo te zadeve po stacku sesul in se debugger čis razkuri
+
+na return adressu vidmo da bodo sami C-ji (KAR POMEN DA LOH POVEMO KAM BI SE RADI VRNIL)
+
+dejmo za foro reč da se naj vrne sam nase.
+
+na primer:
+
+payload = b'AAAAAAAAA'
+payload += b'BBBBBBBB'
+payload += p64(0x66nekineki)
+payload += b'DDDDDDDD'
+
+V RBP (pod registri) vidimo da je notr BBBBBBBB, basepointer je to, kaže na začetek našega stacka, stack pointer pa na konec ( ce hocemo povecat stack sam premaknemo stack pointer). basepointer je da vemo kje se je frame začel. to je torej tudi del segmenta (da vemo kje je prejšnji frame se začel (njegov basepointer))
+
+AAAAAAAAAAAA so ostal v stringu
+
+torej efektivno smo naredil nek loop ker se skos return nastavi na main (main returna v main)

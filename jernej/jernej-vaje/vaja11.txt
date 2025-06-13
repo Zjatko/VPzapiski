@@ -1,0 +1,160 @@
+def 6
+
+v polje preberemo iz datoteke
+
+naredmo en tak file
+
+
+n - pove kok x in y
+prva stvar v datoteki je kok je n
+fillgrid -> narise crto m-krat
+
+npr
+
+3
+5 5
+0 10
+10 10
+3
+5 5 0 10
+5 5 10 10
+0 0 10 10
+
+//naredi trikotnicek
+
+
+mi ne preverimo če je preveč ali premal velik n glede na dejanske vnose točk/črt
+
+
+kako to popravimo -> štejemo število vnosov (pri scanf)
+
+fuzzer uporabimo -> randomly kucamo notr stvari (v naš program) in vidmo a bo kej creshal (to je dost dobr za defenzivno programiranje). sam ni čis random, fuzzerju mormo še neki zraven podat (da bo v pravo smer začel tolčt). zato mu daš primer inputa (neko hevristiko). daš mu ene par primerov, da stabilno lahko testira zadevo.
+
+testni primeri:
+
+in2.txt
+
+
+4
+5 5
+5 15
+11 0
+11 11
+4
+5 5 5 15
+5 15 11 11
+11 11 11 0
+11 0 5 5
+
+in3 .txt
+
+2
+0 0
+20 80
+2
+0 0 20 80
+0 80 20 0
+
+moremo njihov compiler uporabt (afl še uporabi)
+
+apt install afl++ //za ubuntu
+za docker: docker run -ti …..
+
+pol za laufat mas se afl-fuzz -i inputs -o outputs -- ./vulnerable @@
+
+polaufamo fuzzer, vidmo kaj se zjebe neki naredimo
+
+input/output sta diretktorija za to da maš testne primere. v inpute daš inX.txt datoteke
+
+vidmo da je 190 crashov po nekem cajtu in samo 11 shranjenih. zakaj? ker 11 jih je takih unikatnih, samo subset si jih shrani, ker vsi drugi so podobni.
+
+total timetous jih je pa ful (7k)
+
+total execustions jih je 50k so far, dejmo pogledat
+
+mamo tud resume shranjen (datoteko), ce bi hotl nadaljevat po tem k ugasnemo
+
+poglemo ls outputs/default
+zanimive stvari notri so crashes in hangs (timeouti, torej ni crashal se je pa ustavl)
+
+
+gremo v crashes
+večino problematičnih operacij je našel v prvih 100 executionov, potem je pa najdu še neke havoce kasneje v teh 50k (neki specifični case-i)
+
+loh pol cat-amo to oziroma zalaufamo z ./vulnerable outputs/defualt/crashes/id:00000..... //koda crasha
+
+mel smo
+2
+0 0
+20 80
+2
+0 0 200 80 20
+
+in to je crashal. vse je ok dokler ne pride do zadnje vrstice. kaj se zgodi s printf ko mu ne rata vse matchat? kaj sploh printf vrne -> kokr itemov mu rata matchat
+
+zakaj se je pa uspesno izrisal in šele pol crashal? grid je 80x20, notr smo pa pa 200 zabil in smo canary povozil in je stack smashing bil narejen
+
+popravimo tako, da v filline izrisemo samo del, ki je lahko izrisan
+
+minx = minx < 0 ? 0 : minx;
+maxx = maxx > width ? width - 1: maxx
+
+isto za y
+
+zdej nam ne crashne!
+in velik naprej nam tut ne crashne
+
+aha sam pol mamo pa core dumped
+pri temu:
+
+2
+0 0
+2000 80 20 08
+2 80 200
+0 020
+
+tuki mamo dva noda, 0 0 in 2000 80 neki neki in tuki se nam šezmer sesuje, ker readgrida nismo se zrihtal (sezmer gres cez mejo)
+
+zato naredis
+
+if(x < 0 || x >= width || y < 0 || y >= height)
+continue
+
+znotraj for-a za readgrid je to
+
+
+mamo še enga, ki crasha ampak nič ne izpiše
+
+2
+0
+20 80
+2
+: 02000 80 20 0 
+
+dvopičje zjebe. gremo z defensive programming to rešt -> čekiramo outpute
+
+
+if(fscanf(f, "%d", &n) != 1)
+	return 1;
+
+to damo povsod, pa funkcije morjo vracat int
+
+zdj bomo torej vedl da se je na fscanf sestrelil
+
+
+
+dejmo vse crashe v inpute -> da ga se mal spotkurimo da bo vedl kaj je povsem narobe, in bo probu te slabe scenarije še sam
+
+cp outputs/default/crashes/ * input/
+
+in zdej se enkrat pozenmo, da vidmo ce se kej najde.
+
+mamo ogromno več executionov v kratkem času in nič timeoutov (ker je printf zdj pohendlan, da ne bo za brezveze v prazno čakal še na kakšno zadevo, če nima zadost argumentov notr)
+
+neki sezmer crasha ampak ni najdu: ce oba x prevelika bi samo max prestavil za minx in zadeva ne bi delovala.
+prej ali slej bi to mogu najdt.
+
+kaj pa nikoli ne bo najdu? v primeru, če sploh ni datoteke. fuzzer ne pokriva tega case-a. če enkrat usmeriš fuzzer da dela z datoteko, potem ne bo vedu da bo crashal če je ni
+
+
+
